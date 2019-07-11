@@ -118,6 +118,9 @@ namespace dtn
 			else if (tag == "email") {
 				return dtn::core::Node::CONN_EMAIL;
 			}
+            else if (tag == "dgram:unix") {
+                return dtn::core::Node::CONN_DGRAM_UNIX;
+            }
 
 			return dtn::core::Node::CONN_UNSUPPORTED;
 		}
@@ -167,6 +170,9 @@ namespace dtn
 
 			case dtn::core::Node::CONN_EMAIL:
 				return "email";
+
+			case dtn::core::Node::CONN_DGRAM_UNIX:
+				return "dgram:unix";
 			}
 
 			return "unknown";

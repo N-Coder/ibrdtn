@@ -222,6 +222,9 @@ namespace dtn
 
 			case Node::CONN_EMAIL:
 				return "EMAIL";
+
+			case Node::CONN_DGRAM_UNIX:
+				return "DGRAM:UNIX";
 			}
 
 			return "unknown";
@@ -251,7 +254,9 @@ namespace dtn
 				return Node::CONN_P2P_WIFI;
 			} else if (protocol == "P2P:BT") {
 				return Node::CONN_P2P_BT;
-			} else if (protocol == "unsupported") {
+			} else if (protocol == "DGRAM:UNIX") {
+                return Node::CONN_DGRAM_UNIX;
+            } else if (protocol == "unsupported") {
 				return Node::CONN_UNSUPPORTED;
 			}
 

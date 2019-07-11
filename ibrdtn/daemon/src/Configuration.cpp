@@ -717,6 +717,7 @@ namespace dtn
 				if (protocol == "dgram:udp") p = Node::CONN_DGRAM_UDP;
 				if (protocol == "dgram:ethernet") p = Node::CONN_DGRAM_ETHERNET;
 				if (protocol == "dgram:lowpan") p = Node::CONN_DGRAM_LOWPAN;
+				if (protocol == "dgram:unix") p = Node::CONN_DGRAM_UNIX;
 				if (protocol == "email") {
 					p = Node::CONN_EMAIL;
 					ss.clear();
