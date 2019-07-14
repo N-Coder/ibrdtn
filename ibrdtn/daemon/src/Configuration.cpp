@@ -851,6 +851,7 @@ namespace dtn
 					if (type_name == "dgram:lowpan") type = Configuration::NetConfig::NETWORK_DGRAM_LOWPAN;
 					if (type_name == "dgram:ethernet") type = Configuration::NetConfig::NETWORK_DGRAM_ETHERNET;
 					if (type_name == "email") type = Configuration::NetConfig::NETWORK_EMAIL;
+					if (type_name == "dgram:unix") type = Configuration::NetConfig::NETWORK_DGRAM_UNIX;
 
 					// create a new netconfig object
 					Configuration::NetConfig nc(netname, type);
@@ -864,6 +865,12 @@ namespace dtn
 						}
 
 						case Configuration::NetConfig::NETWORK_FILE:
+						{
+							nc.url = conf.read<std::string>(key_path, "");
+							break;
+						}
+
+						case Configuration::NetConfig::NETWORK_DGRAM_UNIX:
 						{
 							nc.url = conf.read<std::string>(key_path, "");
 							break;

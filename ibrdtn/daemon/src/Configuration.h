@@ -69,7 +69,8 @@ namespace dtn
 					NETWORK_DGRAM_UDP = 6,
 					NETWORK_DGRAM_LOWPAN = 7,
 					NETWORK_DGRAM_ETHERNET = 8,
-					NETWORK_EMAIL = 9
+					NETWORK_EMAIL = 9,
+                    NETWORK_DGRAM_UNIX = 10,
 				};
 
 				NetConfig(const std::string &name, NetType type);
@@ -577,7 +578,7 @@ namespace dtn
 				float getPsi() const;
 				float getSyncLevel() const;
 			};
-	
+
 			class DHT: public Configuration::Extension
 			{
 				friend class Configuration;
@@ -710,7 +711,7 @@ namespace dtn
 				 * @return True, if all neighbours are allowed to announce me
 				 */
 				bool isNeighbourAllowedToAnnounceMe() const;
-				
+
 				/**
 				 * If this method return true, neighbours of a found node should be ignored.
 				 * This can be useful, if any routing algorithm can do this instead.
