@@ -277,7 +277,7 @@ namespace dtn
 				_stream << primaryheader[12]; // FRAGMENTATION_OFFSET
 				_stream << primaryheader[13]; // APPLICATION_DATA_LENGTH
 			}
-			
+
 			return (*this);
 		}
 
@@ -386,7 +386,7 @@ namespace dtn
 
 			Length len = 0;
 			len += getLength( (PrimaryBlock&)obj );
-			
+
 			// add size of all blocks
 			for (Bundle::const_iterator iter = obj.begin(); iter != obj.end(); ++iter)
 			{
@@ -663,7 +663,13 @@ namespace dtn
 
 			// check for the right version
 			_stream.get(version);
-			if (version != dtn::data::BUNDLE_VERSION) throw dtn::InvalidProtocolException("Bundle version differ from ours.");
+            if (_stream.eof()) {
+                throw dtn::InvalidDataException("Stream ended before new bundle could be read.");
+            } else if (!_stream.good()) {
+                throw dtn::InvalidDataException("Stream went bad before new bundle could be read.");
+            } else if (version != dtn::data::BUNDLE_VERSION) {
+                throw dtn::InvalidProtocolException("Bundle version differs from ours.");
+            }
 
 			// PROCFLAGS
 			_stream >> obj.procflags;	// processing flags
@@ -713,7 +719,7 @@ namespace dtn
 				_stream >> obj.fragmentoffset;
 				_stream >> obj.appdatalength;
 			}
-			
+
 			// validate this primary block
 			_validator.validate(obj);
 

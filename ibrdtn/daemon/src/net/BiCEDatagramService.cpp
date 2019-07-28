@@ -102,7 +102,7 @@ namespace dtn {
                         ibrcommon::udpsocket &sock = dynamic_cast<ibrcommon::udpsocket &>(**iter);
                         sock.sendto(&tmp[0], length + 2, 0, destination);
                         return;
-                    // } catch (const ibrcommon::Exception &) {
+                        // } catch (const ibrcommon::Exception &) {
                     } catch (const std::bad_cast &) {}
                 }
             } catch (const ibrcommon::Exception &e) {
@@ -121,7 +121,8 @@ namespace dtn {
          */
         void BiCEDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const char *buf,
                                        size_t length) throw(DatagramException) {
-            return;
+            // TODO where to send the "I'm here" broadcasts / discovery announcements / beacons
+            send(type, flags, seqno, "/tmp/serial-wifi", buf, length);
         }
 
         /**
@@ -162,7 +163,7 @@ namespace dtn {
 
                         IBRCOMMON_LOGGER_DEBUG_TAG("BiCEDatagramService", 20)
                             << "recvfrom() type: " << std::hex << (int) type << "; flags: " << std::hex << (int) flags
-                            << "; seqno: " << std::dec << seqno << "; length: " << std::dec << length
+                            << "; seqno: " << std::dec << seqno << "; length: " << std::dec << ret - 2
                             << "; address: " << peeraddr.toString() << IBRCOMMON_LOGGER_ENDL;
 
                         return ret - 2;

@@ -488,24 +488,35 @@ namespace ibrcommon
 	{
 	}
 
-	ssize_t datagramsocket::recvfrom(char *buf, size_t buflen, int flags, ibrcommon::vaddress &addr) throw (socket_exception)
-	{
-		struct sockaddr_storage clientAddress;
-		socklen_t clientAddressLength = sizeof(clientAddress);
-		::memset(&clientAddress, 0, clientAddressLength);
+    ssize_t
+    datagramsocket::recvfrom(char *buf, size_t buflen, int flags, ibrcommon::vaddress &addr) throw(socket_exception) {
+        socklen_t max_address_length = std::max(sizeof(struct sockaddr_storage), sizeof(struct sockaddr_un));
+        socklen_t address_length = max_address_length;
+        uint8_t address_data[address_length];
+        ::memset(&address_data, 0, address_length);
 
-		// data waiting
-		ssize_t ret = ::recvfrom(this->fd(), buf, buflen, flags, (struct sockaddr *) &clientAddress, &clientAddressLength);
+        // data waiting
+        ssize_t ret = ::recvfrom(this->fd(), buf, buflen, flags,
+                                 (struct sockaddr *) &address_data, &address_length);
 
-		if (ret == -1) {
-			throw socket_exception("recvfrom error");
-		}
+        if (ret == -1) {
+            throw socket_exception("recvfrom error");
+        }
+        if (address_length > max_address_length) {
+            throw socket_exception("recvfrom error: sender address too long");
+        }
 
-		char address[256];
-		char service[256];
-		if (::getnameinfo((struct sockaddr *) &clientAddress, clientAddressLength, address, sizeof address, service, sizeof service, NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
-			addr = ibrcommon::vaddress(std::string(address), std::string(service), clientAddress.ss_family);
-		}
+        sa_family_t family = ((struct sockaddr *) &address_data)->sa_family;
+        if (family == AF_UNIX) {
+            addr = ibrcommon::vaddress(std::string(((struct sockaddr_un *) &address_data)->sun_path), "", family);
+        } else {
+            char address[256];
+            char service[256];
+            if (::getnameinfo((struct sockaddr *) &address_data, address_length, address, sizeof address, service,
+                              sizeof service, NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+                addr = ibrcommon::vaddress(std::string(address), std::string(service), family);
+            }
+        }
 
 		return ret;
 	}
