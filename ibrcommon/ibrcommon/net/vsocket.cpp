@@ -518,8 +518,10 @@ namespace ibrcommon
 			_state.setwait(SocketState::SELECT, SocketState::DOWN);
 			_counter++;
 			IBRCOMMON_LOGGER_DEBUG_TAG("SelectGuard", 90) << "SelectGuard counter set to " << _counter << IBRCOMMON_LOGGER_ENDL;
-		} catch (const SocketState::state_exception&) {
-			throw vsocket_interrupt("select interrupted while waiting for IDLE socket");
+		} catch (const SocketState::state_exception& e) {
+            std::stringstream ss;
+            ss << "select interrupted while waiting for IDLE socket (" << e.what() << ")";
+			throw vsocket_interrupt(ss.str());
 		}
 	}
 

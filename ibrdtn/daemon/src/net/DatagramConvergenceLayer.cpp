@@ -148,10 +148,16 @@ namespace dtn
 		void DatagramConvergenceLayer::queue(const dtn::core::Node &node, const dtn::net::BundleTransfer &job)
 		{
 			// do not queue any new jobs if the convergence layer goes down
-			if (!_running) return;
+			if (!_running){
+                IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConvergenceLayer::TAG, 10) << "discarding job for " << node.getEID().getString() << ", not running" << IBRCOMMON_LOGGER_ENDL;
+                return;
+            }
 
 			const std::list<dtn::core::Node::URI> uri_list = node.get(_service->getProtocol());
-			if (uri_list.empty()) return;
+			if (uri_list.empty()){
+                IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConvergenceLayer::TAG, 10) << "discarding job for " << node << ", no URI matches" << DiscoveryService::asTag(_service->getProtocol()) << IBRCOMMON_LOGGER_ENDL;
+                return;
+            }
 
 			// get the first element of the result
 			const dtn::core::Node::URI &uri = uri_list.front();
@@ -228,6 +234,7 @@ namespace dtn
 				_service->bind();
 			} catch (const std::exception &e) {
 				IBRCOMMON_LOGGER_TAG(DatagramConvergenceLayer::TAG, error) << "bind to " << _service->getInterface().toString() << " failed (" << e.what() << ")" << IBRCOMMON_LOGGER_ENDL;
+				return;
 			}
 
 			// register for NodeEvent objects

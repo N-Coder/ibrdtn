@@ -60,7 +60,7 @@ namespace dtn
 
 		void DatagramConnection::shutdown()
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "shutdown()" << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "shutdown(" << getIdentifier() << ")" << IBRCOMMON_LOGGER_ENDL;
 
 			// close the stream
 			__cancellation();
@@ -76,7 +76,7 @@ namespace dtn
 
 		void DatagramConnection::run() throw ()
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "run()" << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "run(" << getIdentifier() << ")" << IBRCOMMON_LOGGER_ENDL;
 
 			// create a filter context
 			dtn::core::FilterContext context;
@@ -131,7 +131,7 @@ namespace dtn
 
 		void DatagramConnection::setup() throw ()
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "setup()" << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "setup(" << getIdentifier() << ")" << IBRCOMMON_LOGGER_ENDL;
 
 			_callback.connectionUp(this);
 			_sender.start();
@@ -139,7 +139,7 @@ namespace dtn
 
 		void DatagramConnection::finally() throw ()
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "finally()" << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 40) << "finally(" << getIdentifier() << ")" << IBRCOMMON_LOGGER_ENDL;
 
 			try {
 				ibrcommon::MutexLock l(_ack_cond);
@@ -171,7 +171,7 @@ namespace dtn
 		 */
 		void DatagramConnection::queue(const dtn::net::BundleTransfer &job)
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 15) << "queue bundle " << job.getBundle().toString() << " to " << job.getNeighbor().getString() << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 15) << "queue bundle " << job.getBundle().toString() << " to " << job.getNeighbor().getString() << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 			_sender.queue.push(job);
 		}
 
@@ -182,7 +182,7 @@ namespace dtn
 		 */
 		void DatagramConnection::queue(const char &flags, const unsigned int &seqno, const char *buf, const dtn::data::Length &len)
 		{
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 25) << "frame received, flags: " << (int)flags << ", seqno: " << seqno << ", len: " << len << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 25) << "frame received, flags: " << (int)flags << ", seqno: " << seqno << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
 			try {
 				// we will accept every sequence number on first segments
@@ -288,7 +288,7 @@ namespace dtn
 			// set the seqno for this segment
 			unsigned int seqno = _last_ack;
 
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 25) << "frame to send, flags: " << (int)flags << ", seqno: " << seqno << ", len: " << len << IBRCOMMON_LOGGER_ENDL;
+			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 25) << "frame to send, flags: " << (int)flags << ", seqno: " << seqno << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
 			if (_params.flowcontrol == DatagramService::FLOW_STOPNWAIT)
 			{
@@ -697,7 +697,7 @@ namespace dtn
 			// if there is nothing to send, just return
 			if (bytes == 0)
 			{
-				IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 35) << "Stream::overflow() nothing to sent" << IBRCOMMON_LOGGER_ENDL;
+				IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConnection::TAG, 35) << "Stream::overflow() nothing to send" << IBRCOMMON_LOGGER_ENDL;
 				return std::char_traits<char>::not_eof(c);
 			}
 
@@ -807,6 +807,7 @@ namespace dtn
 						// push bundle through the filter routines
 						context.setBundle(bundle);
 						context.setPeer(job.getNeighbor());
+                        // TODO add connection identifier to filter context
 						BundleFilter::ACTION ret = dtn::core::BundleCore::getInstance().filter(dtn::core::BundleFilter::OUTPUT, context, bundle);
 
 						if (ret != BundleFilter::ACCEPT) {
