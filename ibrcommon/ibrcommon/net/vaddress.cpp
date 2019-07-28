@@ -217,6 +217,10 @@ namespace ibrcommon
 
 	const std::string vaddress::name() const throw (address_exception)
 	{
+        if (_family == AF_UNIX) {
+            return _address;
+        }
+
 		struct addrinfo hints;
 		char addr_str[256];
 		struct addrinfo *res;

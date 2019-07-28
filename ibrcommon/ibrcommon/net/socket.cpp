@@ -273,39 +273,47 @@ namespace ibrcommon
 		return true;
 	}
 
-	void basesocket::init_socket(const vaddress &addr, int type, int protocol) throw (socket_exception)
-	{
-		try {
-			_family = addr.family();
-			if ((_fd = ::socket(_family, type, protocol)) < 0) {
-				throw socket_raw_error(__errno, "cannot create socket");
-			}
-		} catch (const vaddress::address_exception&) {
-			// if no address is set use DEFAULT_SOCKET_FAMILY
-			if ((_fd = ::socket(DEFAULT_SOCKET_FAMILY, type, protocol)) > -1) {
-				_family = static_cast<sa_family_t>(DEFAULT_SOCKET_FAMILY);
-			}
-			// if that fails switch to the alternative SOCKET_FAMILY
-			else if ((_fd = ::socket(DEFAULT_SOCKET_FAMILY_ALTERNATIVE, type, protocol)) > -1) {
-				_family = static_cast<sa_family_t>(DEFAULT_SOCKET_FAMILY_ALTERNATIVE);
+    void basesocket::init_socket(const vaddress &addr, int type, int protocol) throw(socket_exception) {
+        try {
+            _family = addr.family();
+            IBRCOMMON_LOGGER_DEBUG_TAG("socket", 10)
+                << "create socket for addr " << addr.toString() << " with family " << _family << ", type " << type
+                << " and protocol " << protocol << IBRCOMMON_LOGGER_ENDL;
+            if ((_fd = ::socket(_family, type, protocol)) < 0) {
+                std::stringstream ss;
+                ss << "cannot create socket for addr " << addr.toString() << " with family " << _family
+                   << ", type " << type << " and protocol " << protocol;
+                throw socket_raw_error(__errno, ss.str());
+            }
+        } catch (const vaddress::address_exception &) {
+            // if no address is set use DEFAULT_SOCKET_FAMILY
+            if ((_fd = ::socket(DEFAULT_SOCKET_FAMILY, type, protocol)) > -1) {
+                _family = static_cast<sa_family_t>(DEFAULT_SOCKET_FAMILY);
+            }
+                // if that fails switch to the alternative SOCKET_FAMILY
+            else if ((_fd = ::socket(DEFAULT_SOCKET_FAMILY_ALTERNATIVE, type, protocol)) > -1) {
+                _family = static_cast<sa_family_t>(DEFAULT_SOCKET_FAMILY_ALTERNATIVE);
 
-				// set the alternative socket family as default
-				DEFAULT_SOCKET_FAMILY = DEFAULT_SOCKET_FAMILY_ALTERNATIVE;
-			}
-			else
-			{
-				throw socket_raw_error(__errno, "cannot create socket");
-			}
-		}
-	}
+                // set the alternative socket family as default
+                DEFAULT_SOCKET_FAMILY = DEFAULT_SOCKET_FAMILY_ALTERNATIVE;
+            } else {
+                std::stringstream ss;
+                ss << "cannot create socket for addr " << addr.toString() << " with default family, type "
+                   << type << " and protocol " << protocol;
+                throw socket_raw_error(__errno, ss.str());
+            }
+        }
+    }
 
-	void basesocket::init_socket(int domain, int type, int protocol) throw (socket_exception)
-	{
-		_family = static_cast<sa_family_t>(domain);
-		if ((_fd = ::socket(domain, type, protocol)) < 0) {
-			throw socket_raw_error(__errno, "cannot create socket");
-		}
-	}
+    void basesocket::init_socket(int domain, int type, int protocol) throw(socket_exception) {
+        _family = static_cast<sa_family_t>(domain);
+        if ((_fd = ::socket(domain, type, protocol)) < 0) {
+            std::stringstream ss;
+            ss << "cannot create socket with domain/family " << _family
+               << ", type " << type << " and protocol " << protocol;
+            throw socket_raw_error(__errno, ss.str());
+        }
+    }
 
 	void basesocket::bind(int fd, struct sockaddr *addr, socklen_t len) throw (socket_exception)
 	{
@@ -315,12 +323,13 @@ namespace ibrcommon
 			// error
 			int bind_err = __errno;
 
-			char addr_str[256];
-			char serv_str[256];
-			::getnameinfo(addr, len, (char*)&addr_str, 256, (char*)&serv_str, 256, NI_NUMERICHOST | NI_NUMERICSERV);
-			std::stringstream ss;
-			vaddress vaddr(addr_str, serv_str, addr->sa_family);
-			ss << "with address " << vaddr.toString();
+            char addr_str[256];
+            char serv_str[256];
+            ::getnameinfo(addr, len, (char *) &addr_str, 256, (char *) &serv_str, 256, NI_NUMERICHOST | NI_NUMERICSERV);
+            std::stringstream ss;
+            vaddress vaddr(addr_str, serv_str, addr->sa_family);
+            ss << "with address " << vaddr.toString();
+            ss << " (code " << bind_err << ")";
 
 			check_bind_error(bind_err, ss.str());
 		}
@@ -501,44 +510,50 @@ namespace ibrcommon
 		return ret;
 	}
 
-	void datagramsocket::sendto(const char *buf, size_t buflen, int flags, const ibrcommon::vaddress &addr) throw (socket_exception)
-	{
-		int ret = 0;
-		struct addrinfo hints, *res;
-		memset(&hints, 0, sizeof hints);
-
-		hints.ai_family = _family;
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_flags = AI_ADDRCONFIG;
+    void datagramsocket::sendto(const char *buf, size_t buflen, int flags,
+                                const ibrcommon::vaddress &addr) throw(socket_exception) {
+        int ret = 0;
+        ssize_t len = 0;
 
 		std::string address;
 		std::string service;
 
-		try {
-			address = addr.address();
-		} catch (const vaddress::address_not_set&) {
-			throw socket_exception("need at least an address to send to");
-		};
+        try {
+            address = addr.address();
+        } catch (const vaddress::address_not_set &) {
+            throw socket_exception("need at least an address to send to");
+        }
 
-		try {
-			service = addr.service();
-		} catch (const vaddress::address_not_set&) { };
+        try {
+            service = addr.service();
+        } catch (const vaddress::service_not_set &) {};
 
-		if ((ret = ::getaddrinfo(address.c_str(), service.c_str(), &hints, &res)) != 0)
-		{
-			throw socket_exception("getaddrinfo(): " + std::string(gai_strerror(ret)));
-		}
+        if (_family == AF_UNIX) {
+            struct sockaddr_un saddr;
+            memset(&saddr, 0, sizeof(saddr));
+            saddr.sun_family = AF_UNIX;
+            strncpy(saddr.sun_path, addr.address().c_str(), sizeof(saddr.sun_path));
+            len = ::sendto(this->fd(), buf, buflen, flags, (struct sockaddr *) &saddr, sizeof(saddr));
+        } else {
+            struct addrinfo hints, *res;
+            memset(&hints, 0, sizeof hints);
 
-		ssize_t len = 0;
-		len = ::sendto(this->fd(), buf, buflen, flags, res->ai_addr, res->ai_addrlen);
+            hints.ai_family = _family;
+            hints.ai_socktype = SOCK_DGRAM;
+            hints.ai_flags = AI_ADDRCONFIG;
 
-		// free the addrinfo struct
-		freeaddrinfo(res);
+            if ((ret = ::getaddrinfo(address.c_str(), service.c_str(), &hints, &res)) != 0) {
+                throw socket_exception("getaddrinfo(): " + std::string(gai_strerror(ret)));
+            }
 
-		if (len == -1) {
-			throw socket_raw_error(__errno);
-		}
-	}
+            len = ::sendto(this->fd(), buf, buflen, flags, res->ai_addr, res->ai_addrlen);
+
+            freeaddrinfo(res);
+        }
+        if (len == -1) {
+            throw socket_raw_error(__errno);
+        }
+    }
 
 	filesocket::filesocket(int fd)
 	 : clientsocket(fd)
@@ -1017,7 +1032,7 @@ namespace ibrcommon
 		if (_state != SOCKET_DOWN)
 			throw socket_exception("socket is already up");
 
-		init_socket(_address, SOCK_DGRAM, IPPROTO_UDP);
+        init_socket(_address, SOCK_DGRAM, 0);
 
 		try {
 			// test if the service is defined
@@ -1052,10 +1067,19 @@ namespace ibrcommon
 		this->close();
 	}
 
-	void udpsocket::bind(const vaddress &addr) throw (socket_exception)
-	{
-		struct addrinfo hints, *res;
-		memset(&hints, 0, sizeof hints);
+    void udpsocket::bind(const vaddress &addr) throw(socket_exception)
+    {
+        if (_family == AF_UNIX) {
+            struct sockaddr_un saddr;
+            memset(&saddr, 0, sizeof(saddr));
+            saddr.sun_family = AF_UNIX;
+            strncpy(saddr.sun_path, addr.address().c_str(), sizeof(saddr.sun_path));
+            basesocket::bind(_fd, (struct sockaddr *) &saddr, sizeof(saddr));
+            return;
+        }
+
+        struct addrinfo hints, *res;
+        memset(&hints, 0, sizeof hints);
 
 		hints.ai_family = _family;
 		hints.ai_socktype = SOCK_DGRAM;
