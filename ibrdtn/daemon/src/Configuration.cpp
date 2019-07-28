@@ -717,9 +717,15 @@ namespace dtn
 				if (protocol == "dgram:udp") p = Node::CONN_DGRAM_UDP;
 				if (protocol == "dgram:ethernet") p = Node::CONN_DGRAM_ETHERNET;
 				if (protocol == "dgram:lowpan") p = Node::CONN_DGRAM_LOWPAN;
-				if (protocol == "dgram:unix") p = Node::CONN_DGRAM_UNIX;
+				if (protocol == "dgram:unix") {
+				    p = Node::CONN_DGRAM_UNIX;
+                    ss.str(std::string());
+				    ss.clear();
+                    ss << conf.read<std::string>(prefix + "path", "/tmp/default-handler");
+				}
 				if (protocol == "email") {
 					p = Node::CONN_EMAIL;
+                    ss.str(std::string());
 					ss.clear();
 					ss << "email=" << conf.read<std::string>(prefix + "email", "root@localhost") << ";";
 				}
@@ -873,6 +879,7 @@ namespace dtn
 						case Configuration::NetConfig::NETWORK_DGRAM_UNIX:
 						{
 							nc.url = conf.read<std::string>(key_path, "");
+                            nc.mtu = conf.read<int>(key_mtu, 1280);
 							break;
 						}
 

@@ -1,6 +1,8 @@
 ## sub directory
 
-net_SOURCES = 	BundleReceiver.h \
+net_SOURCES = BundleReceiver.h \
+	BiCEDatagramService.cpp \
+	BiCEDatagramService.h \
 	BundleTransfer.h \
 	BundleTransfer.cpp \
 	ConnectionEvent.cpp \
