@@ -76,7 +76,7 @@ Android.mk: Makefile.am
 		-:LDFLAGS $(AM_LDFLAGS) \
 			$(subst lib,libdtnd_, $(dtnd_libs)) \
 			-lz \
-			-lgnustl_shared \
+			-lc++_shared \
 			-librcommon \
 		-:LIBFILTER_WHOLE dtnd_core dtnd_storage dtnd_net dtnd_routing dtnd_api \
 		-:SUBDIR $(patsubst %,src/%, $(SUBDIRS)) \

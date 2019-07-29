@@ -29,7 +29,7 @@
 
 	<!-- READ_LOGS is needed on Android < 4.1, On Android >= 4.1 an app can 
 		read it's own logs without permission -->
-	<uses-permission android:name="android.permission.READ_LOGS" />
+	<!--<uses-permission android:name="android.permission.READ_LOGS" />-->
 
 	<!-- Custom permission to send/received bundles using the DTN services -->
 	<uses-permission android:name="de.tubs.ibr.dtn.permission.DTN_COMMUNICATION" />

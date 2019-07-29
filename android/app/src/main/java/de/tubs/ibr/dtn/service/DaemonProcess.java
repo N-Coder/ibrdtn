@@ -63,15 +63,7 @@ public class DaemonProcess {
 	
 	private WifiManager.MulticastLock mMcastLock = null;
 
-	private final static String GNUSTL_NAME = "gnustl_shared";
-	private final static String CRYPTO_NAME = "cryptox";
-	private final static String SSL_NAME = "ssl";
-	private final static String IBRCOMMON_NAME = "ibrcommon";
-	private final static String IBRDTN_NAME = "ibrdtn";
-	private final static String DTND_NAME = "dtnd";
-	private final static String ANDROID_GLUE_NAME = "android-glue";
-
-    public interface OnRestartListener {
+	public interface OnRestartListener {
         public void OnStop(DaemonRunLevel previous, DaemonRunLevel next);
         public void OnReloadConfiguration();
         public void OnStart(DaemonRunLevel previous, DaemonRunLevel next);
@@ -84,16 +76,16 @@ public class DaemonProcess {
 	{
 		try
 		{
-			System.loadLibrary(GNUSTL_NAME);
+			System.loadLibrary("c++_shared");
 
-			System.loadLibrary(CRYPTO_NAME);
-			System.loadLibrary(SSL_NAME);
+			System.loadLibrary("cryptox");
+			System.loadLibrary("ssl");
 
-			System.loadLibrary(IBRCOMMON_NAME);
-			System.loadLibrary(IBRDTN_NAME);
-			System.loadLibrary(DTND_NAME);
+			System.loadLibrary("ibrcommon");
+			System.loadLibrary("ibrdtn");
+			System.loadLibrary("dtnd");
 
-			System.loadLibrary(ANDROID_GLUE_NAME);
+			System.loadLibrary("android-glue");
 		} catch (UnsatisfiedLinkError e)
 		{
 			Log.e(TAG, "UnsatisfiedLinkError! Are you running special hardware?", e);

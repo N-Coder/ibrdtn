@@ -46,7 +46,7 @@ Android.mk: Makefile.am
 		-:LDFLAGS $(AM_LDFLAGS) \
 			$(subst lib,libibrdtn_, $(ibrdtn_libs)) \
 			-lz \
-			-lgnustl_shared \
+			-lc++_shared \
 		-:LIBFILTER_WHOLE ibrdtn_api ibrdtn_data ibrdtn_streams ibrdtn_utils ibrdtn_security \
 		-:SUBDIR $(patsubst %,ibrdtn/%, $(SUBDIRS)) \
 		> $@

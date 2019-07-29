@@ -43,7 +43,7 @@ namespace ibrcommon
 			Exception() throw()
 			{};
 
-			Exception(const exception&) throw()
+			Exception(const std::exception&) throw()
 			{};
 
 			virtual ~Exception() throw()
