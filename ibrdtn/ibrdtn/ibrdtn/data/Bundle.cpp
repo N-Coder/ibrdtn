@@ -96,6 +96,21 @@ namespace dtn
 			return (const PrimaryBlock&)(*this) > (const PrimaryBlock&)other;
 		}
 
+        std::string Bundle::toString() const
+        {
+            std::stringstream ss;
+            ss << PrimaryBlock::toString() << "{";
+            auto last = _blocks.rbegin();
+            for (const auto &_block : _blocks) {
+                ss << _block->toString();
+                if (&_block == &(*last)) {
+                    ss << ", ";
+                }
+            }
+            ss << "}";
+            return ss.str();
+        }
+
 		void Bundle::remove(const dtn::data::Block &block)
 		{
 			for (iterator it = begin(); it != end(); ++it)
@@ -234,7 +249,7 @@ namespace dtn
 
 			return (*block);
 		}
-		
+
 		Block& Bundle::insert(iterator before, dtn::data::ExtensionBlock::Factory& factory)
 		{
 			if (size() > 0) {

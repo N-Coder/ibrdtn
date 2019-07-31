@@ -224,9 +224,14 @@ namespace dtn
 
 		std::pair<bool, dtn::core::Node::Protocol> NeighborRoutingExtension::shouldRouteTo(const dtn::data::MetaBundle &meta, const NeighborDatabase::NeighborEntry &n, const dtn::net::ConnectionManager::protocol_list &plist) const
 		{
+            std::stringstream transferinfo;
+            transferinfo << "transfer " << meta.BundleID::toString()
+                         << " to " << n.eid.getString() << " (" << n.getFreeTransferSlots() << " free)";
 			// check Scope Control Block - do not forward bundles with hop limit == 0
 			if (meta.hopcount == 0)
 			{
+                IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                    << "don't " << transferinfo.str() << ": hopcount==0" << IBRCOMMON_LOGGER_ENDL;
 				return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 			}
 
@@ -235,12 +240,17 @@ namespace dtn
 				// do not forward local bundles
 				if (meta.destination.sameHost(dtn::core::BundleCore::local))
 				{
+                    IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                        << "don't " << transferinfo.str() << ": is local" << IBRCOMMON_LOGGER_ENDL;
 					return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 				}
 
 				// do not forward bundles for other nodes
 				if (!meta.destination.sameHost(n.eid))
 				{
+                    IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                        << "don't " << transferinfo.str() << ": destined to " << meta.destination.getString() 
+                        << IBRCOMMON_LOGGER_ENDL;
 					return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 				}
 
@@ -249,9 +259,13 @@ namespace dtn
 					const RoutingLimitations &limits = n.getDataset<RoutingLimitations>();
 
 					// check if the payload is too large for the neighbor
-					if ((limits.getLimit(RoutingLimitations::LIMIT_BLOCKSIZE) > 0) &&
-						((size_t)limits.getLimit(RoutingLimitations::LIMIT_BLOCKSIZE) < meta.getPayloadLength()))
+                    ssize_t limit = limits.getLimit(RoutingLimitations::LIMIT_BLOCKSIZE);
+                    if (limit > 0 && limit < meta.getPayloadLength())
 					{
+                        IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                            << "don't " << transferinfo.str() << ": payload " << meta.getPayloadLength()
+                            << " bigger than MTU " << limit
+                            << IBRCOMMON_LOGGER_ENDL;
 						return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 					}
 				} catch (const NeighborDatabase::DatasetNotAvailableException&) { }
@@ -259,12 +273,17 @@ namespace dtn
 			else
 			{
 				// do not forward non-singleton bundles
+                IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                    << "don't " << transferinfo.str() << ": non-singleton" << IBRCOMMON_LOGGER_ENDL;
 				return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 			}
 
 			// do not forward bundles already known by the destination
 			if (n.has(meta))
 			{
+
+                IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                    << "don't " << transferinfo.str() << ": already known" << IBRCOMMON_LOGGER_ENDL;
 				return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 			}
 
@@ -288,10 +307,15 @@ namespace dtn
 				if (ret == dtn::core::BundleFilter::ACCEPT)
 				{
 					// put the selected bundle with targeted interface into the result-set
+                    IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                        << transferinfo.str() << " via " << Node::toString(p) << IBRCOMMON_LOGGER_ENDL;
 					return std::make_pair(true, p);
 				}
 			}
 
+            IBRCOMMON_LOGGER_DEBUG_TAG(NeighborRoutingExtension::TAG, 50)
+                << "don't " << transferinfo.str() << ": all of " << plist.size() << " protocols rejected"
+                << IBRCOMMON_LOGGER_ENDL;
 			return std::make_pair(false, dtn::core::Node::CONN_UNDEFINED);
 		}
 
@@ -373,7 +397,10 @@ namespace dtn
 
 		std::string NeighborRoutingExtension::ProcessBundleTask::toString()
 		{
-			return "ProcessBundleTask: " + bundle.toString();
+            std::stringstream ss;
+            ss << "ProcessBundleTask: " << bundle.toString();
+            ss << " from " << origin.getString() << " to " << nexthop.getString();
+            return ss.str();
 		}
 	}
 }

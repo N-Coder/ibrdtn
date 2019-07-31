@@ -22,6 +22,7 @@
 #ifndef METABUNDLE_CPP_
 #define METABUNDLE_CPP_
 
+#include <iomanip>
 #include "ibrdtn/data/MetaBundle.h"
 #include "ibrdtn/utils/Clock.h"
 #include "ibrdtn/data/ScopeControlHopLimitBlock.h"
@@ -156,6 +157,37 @@ namespace dtn
 
 			return -1;
 		}
+
+        std::string MetaBundle::toString() const
+        {
+            std::stringstream ss;
+            ss << BundleID::toString() << "--";
+            if (!reportto.isNone() || !custodian.isNone()) {
+                ss << "(";
+                if (!reportto.isNone()) {
+                    ss << "r" << reportto.getString();
+                    if (!custodian.isNone()) ss << ", ";
+                }
+                if (!custodian.isNone()) {
+                    ss << "c" << reportto.getString();
+                }
+                ss << ")";
+            }
+            ss << "->" << destination.getString() << " (meta";
+            std::ios_base::fmtflags fmtflags = ss.flags();
+            ss << ", flags 0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(8) << procflags.get();
+            ss.flags(fmtflags);
+            ss << ", hops ";
+            if (hopcount == hopcount.max()) {
+                ss << "max";
+            } else {
+                ss << hopcount.get();
+            }
+            ss << ", ttl " << lifetime.get();
+            ss << ", expire " << expiretime.get();
+            ss << ")";
+            return ss.str();
+        }
 
 		bool MetaBundle::get(dtn::data::PrimaryBlock::FLAGS flag) const
 		{

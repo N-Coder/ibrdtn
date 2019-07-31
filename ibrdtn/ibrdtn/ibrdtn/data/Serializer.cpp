@@ -33,6 +33,7 @@
 #include <ibrcommon/Logger.h>
 #include <list>
 #include <limits>
+#include <iomanip>
 
 #ifdef __DEVELOPMENT_ASSERTIONS__
 #include <cassert>
@@ -668,7 +669,14 @@ namespace dtn
             } else if (!_stream.good()) {
                 throw dtn::InvalidDataException("Stream went bad before new bundle could be read.");
             } else if (version != dtn::data::BUNDLE_VERSION) {
-                throw dtn::InvalidProtocolException("Bundle version differs from ours.");
+                std::stringstream ss;
+                ss << "Bundle version (0x"
+                   << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
+                   << static_cast<unsigned>(version)
+                   << ") differs from ours (0x"
+                   << static_cast<unsigned>(dtn::data::BUNDLE_VERSION)
+                   << ").";
+                throw dtn::InvalidProtocolException(ss.str());
             }
 
 			// PROCFLAGS

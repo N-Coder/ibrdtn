@@ -23,6 +23,7 @@
 #include "ibrdtn/data/Exceptions.h"
 #include "ibrdtn/utils/Clock.h"
 #include <ibrcommon/thread/MutexLock.h>
+#include <iomanip>
 
 namespace dtn
 {
@@ -129,6 +130,30 @@ namespace dtn
 		{
 			return (const BundleID&)*this > other;
 		}
+
+        std::string PrimaryBlock::toString() const
+        {
+            std::stringstream ss;
+            ss << BundleID::toString() << "--";
+            if (!reportto.isNone() || !custodian.isNone()) {
+                ss << "(";
+                if (!reportto.isNone()) {
+                    ss << "r" << reportto.getString();
+                    if (!custodian.isNone()) ss << ", ";
+                }
+                if (!custodian.isNone()) {
+                    ss << "c" << reportto.getString();
+                }
+                ss << ")";
+            }
+            ss << "->" << destination.getString() << " (primary";
+            std::ios_base::fmtflags fmtflags = ss.flags();
+            ss << ", flags 0x" << std::hex << std::uppercase << std::setfill('0') << std::setw(8) << procflags.get();
+            ss.flags(fmtflags);
+            ss << ", ttl " << lifetime.get();
+            ss << ")";
+            return ss.str();
+        }
 
 		void PrimaryBlock::relabel(bool zero_timestamp)
 		{

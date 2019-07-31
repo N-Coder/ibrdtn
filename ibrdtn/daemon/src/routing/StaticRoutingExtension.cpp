@@ -268,14 +268,18 @@ namespace dtn
 						IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10) << "task " << t->toString() << " aborted: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
 					} catch (const std::bad_cast&) { };
 
-					try {
-						const ProcessBundleTask &task = dynamic_cast<ProcessBundleTask&>(*t);
-						IBRCOMMON_LOGGER_DEBUG_TAG(StaticRoutingExtension::TAG, 50) << "search static route for " << task.bundle.toString() << IBRCOMMON_LOGGER_ENDL;
+                    try {
+                        const ProcessBundleTask &task = dynamic_cast<ProcessBundleTask &>(*t);
+                        bool is_singleton = task.bundle.get(dtn::data::PrimaryBlock::DESTINATION_IS_SINGLETON);
+                        IBRCOMMON_LOGGER_DEBUG_TAG(StaticRoutingExtension::TAG, 50)
+                            << "search static route for " << task.bundle.toString()
+                            << ", destination " << (is_singleton ? "is" : "not") << " singleton, " << _routes.size()
+                            << " routes known" << IBRCOMMON_LOGGER_ENDL;
 
-						// check Scope Control Block - do not forward non-group bundles with hop limit <= 1
-						if ((task.bundle.hopcount <= 1) && (task.bundle.get(dtn::data::PrimaryBlock::DESTINATION_IS_SINGLETON))) continue;
+                        // check Scope Control Block - do not forward non-group bundles with hop limit <= 1
+                        if ((task.bundle.hopcount <= 1) && is_singleton) continue;
 
-						// look for routes to this node
+                        // look for routes to this node
 						for (std::list<StaticRoute*>::const_iterator iter = _routes.begin(); iter != _routes.end(); ++iter)
 						{
 							const StaticRoute &route = (**iter);
