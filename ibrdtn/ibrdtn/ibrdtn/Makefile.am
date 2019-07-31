@@ -40,13 +40,12 @@ endif
 Android.mk: Makefile.am
 	$(ANDROGENIZER) -:PROJECT $(GENERIC_LIBRARY_NAME) \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
-		-:SHARED ibrdtn \
+		-:STATIC ibrdtn \
 		-:SOURCES $(h_sources) $(cc_sources) \
 		-:CPPFLAGS $(AM_CPPFLAGS) \
 		-:LDFLAGS $(AM_LDFLAGS) \
 			$(subst lib,libibrdtn_, $(ibrdtn_libs)) \
 			-lz \
-			-lc++_shared \
 		-:LIBFILTER_WHOLE ibrdtn_api ibrdtn_data ibrdtn_streams ibrdtn_utils ibrdtn_security \
 		-:SUBDIR $(patsubst %,ibrdtn/%, $(SUBDIRS)) \
 		> $@

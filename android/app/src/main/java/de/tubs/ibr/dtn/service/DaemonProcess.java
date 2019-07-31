@@ -81,8 +81,8 @@ public class DaemonProcess {
 //			System.loadLibrary("cryptox");
 //			System.loadLibrary("ssl");
 
-			System.loadLibrary("ibrcommon");
-			System.loadLibrary("ibrdtn");
+//			System.loadLibrary("ibrcommon");
+//			System.loadLibrary("ibrdtn");
 			System.loadLibrary("dtnd");
 
 			System.loadLibrary("android-glue");

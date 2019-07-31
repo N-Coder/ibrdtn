@@ -19,8 +19,6 @@ APP_PLATFORM:=android-24
 # select c++ gnu stl, because we need exception support
 APP_STL := c++_shared
 
-APP_CFLAGS+=-fPIC
-
 # enable exceptions and rtti (information about data types at runtime)
 APP_CPPFLAGS+=-fexceptions -frtti
 #APP_CPPFLAGS+=-Wall -Wextra -Wconversion
@@ -37,9 +35,7 @@ APP_CPPFLAGS+=-I$(abspath $(LOCAL_PATH))/ibrcommon
 # dtnd
 # also include ibrdtn headers
 APP_CPPFLAGS+=-I$(abspath $(LOCAL_PATH))/ibrdtn
-APP_CPPFLAGS+=-Ic++_shared
 
 # If APP_MODULES is not set, all modules are compiled!
 APP_MODULES:=ibrcommon ibrdtn dtnd android-glue
 #APP_MODULES:=all
-
