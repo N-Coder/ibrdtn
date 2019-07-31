@@ -119,11 +119,11 @@ ANDROID_AC_BUILD([
 	use_netlink="yes"
 	
 	# OpenSSL
-	AC_DEFINE(HAVE_OPENSSL, [1], ["openssl library is available"])
-	AC_DEFINE(IBRCOMMON_SUPPORT_SSL, [1], ["ssl extension is available"])
-	OPENSSL_LIBS="-lssl -lcryptox"
-	AC_SUBST(OPENSSL_LIBS)
-	use_openssl="yes"
+	#AC_DEFINE(HAVE_OPENSSL, [1], ["openssl library is available"])
+	#AC_DEFINE(IBRCOMMON_SUPPORT_SSL, [1], ["ssl extension is available"])
+	#OPENSSL_LIBS="-lssl -lcryptox"
+	#AC_SUBST(OPENSSL_LIBS)
+	use_openssl="no"
 
 	# Lowpan
 	#AC_DEFINE(HAVE_LOWPAN_SUPPORT, [1], [])

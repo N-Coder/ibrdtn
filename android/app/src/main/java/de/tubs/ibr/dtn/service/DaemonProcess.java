@@ -78,8 +78,8 @@ public class DaemonProcess {
 		{
 			System.loadLibrary("c++_shared");
 
-			System.loadLibrary("cryptox");
-			System.loadLibrary("ssl");
+//			System.loadLibrary("cryptox");
+//			System.loadLibrary("ssl");
 
 			System.loadLibrary("ibrcommon");
 			System.loadLibrary("ibrdtn");
