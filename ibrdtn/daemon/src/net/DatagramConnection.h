@@ -213,7 +213,7 @@ namespace dtn
 				ibrcommon::TimeMeasurement tm;
 			};
 			std::list<window_frame> _send_window_frames;
-            std::string window_to_string(std::list<window_frame>, size_t max_width);
+            std::string window_to_string(std::list<window_frame> &frames, size_t max_width);
             size_t window_width(std::list<window_frame> &frames) const;
         };
 	} /* namespace data */

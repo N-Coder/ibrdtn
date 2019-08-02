@@ -22,6 +22,7 @@ namespace dtn {
             _params.max_seq_numbers = 16;        // seqno 0..15
             _params.initial_timeout = 200;        // ms
             _params.retry_limit = 5;
+            _params.send_window_size = 8;
         }
 
         BiCEDatagramService::~BiCEDatagramService() {

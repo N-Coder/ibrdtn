@@ -121,7 +121,7 @@ namespace dtn {
                 << _avg_rtt << IBRCOMMON_LOGGER_ENDL;
         }
 
-        std::string DatagramConnection::window_to_string(std::list<window_frame> frames, size_t max_width) {
+        std::string DatagramConnection::window_to_string(std::list<window_frame> &frames, size_t max_width) {
             std::stringstream ss;
             ss << "{";
             for (auto it = frames.begin(); it != frames.end(); it++) {
@@ -137,16 +137,19 @@ namespace dtn {
             size_t width = window_width(frames);
             ss << "}(" << frames.size() << "/" << width << "/" << max_width << ")";
             if (frames.size() > width || width > max_width) {
-                ss << " violates max window size/width";
-                throw DatagramException(ss.str());
-            } else {
-                return ss.str();
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
+                    << "window width violation: " << ss.str() << IBRCOMMON_LOGGER_ENDL;
             }
+            return ss.str();
         }
 
         size_t DatagramConnection::window_width(std::list<window_frame> &frames) const {
-            size_t width = _params.max_seq_numbers + frames.back().seqno - frames.front().seqno;
-            return width % _params.max_seq_numbers;
+            if (frames.empty()) {
+                return 0;
+            } else {
+                size_t width = _params.max_seq_numbers + frames.back().seqno - frames.front().seqno;
+                return (width + 1) % _params.max_seq_numbers;
+            }
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -397,34 +400,36 @@ namespace dtn {
                     // get the next job
                     dtn::net::BundleTransfer job = queue.poll(); // from DatagramConnection::queue_data_to_send
 
+                    dtn::data::Bundle bundle;
                     try {
                         // read the bundle out of the storage
-                        dtn::data::Bundle bundle = storage.get(job.getBundle());
-
-                        // push bundle through the filter routines
-                        context.setBundle(bundle);
-                        context.setPeer(job.getNeighbor());
-                        // TODO add connection identifier to filter context
-                        BundleFilter::ACTION ret = dtn::core::BundleCore::getInstance().filter(
-                                dtn::core::BundleFilter::OUTPUT, context, bundle);
-
-                        if (ret != BundleFilter::ACCEPT) {
-                            job.abort(dtn::net::TransferAbortedEvent::REASON_REFUSED_BY_FILTER);
-                            continue;
-                        }
-
-                        // write the bundle into the stream
-                        serializer << bundle;
-                        _stream.flush();
-
-                        // check if the stream is still marked as good
-                        if (_stream.good()) {
-                            // bundle send completely - raise bundle event
-                            job.complete();
-                        }
+                        bundle = storage.get(job.getBundle());
                     } catch (const dtn::storage::NoBundleFoundException &) {
                         // could not load the bundle, abort the job
                         job.abort(dtn::net::TransferAbortedEvent::REASON_BUNDLE_DELETED);
+                        continue;
+                    }
+
+                    // push bundle through the filter routines
+                    context.setBundle(bundle);
+                    context.setPeer(job.getNeighbor());
+                    // TODO add connection identifier to filter context
+                    BundleFilter::ACTION ret = dtn::core::BundleCore::getInstance().filter(
+                            dtn::core::BundleFilter::OUTPUT, context, bundle);
+
+                    if (ret != BundleFilter::ACCEPT) {
+                        job.abort(dtn::net::TransferAbortedEvent::REASON_REFUSED_BY_FILTER);
+                        continue;
+                    }
+
+                    // write the bundle into the stream
+                    serializer << bundle;
+                    _stream.flush();
+
+                    // check if the stream is still marked as good
+                    if (_stream.good()) {
+                        // bundle send completely - raise bundle event
+                        job.complete();
                     }
                 }
 
@@ -498,17 +503,17 @@ namespace dtn {
             _send_window_frames.emplace_back(); // constructs new window_frame() and appends it
             window_frame &new_frame = _send_window_frames.back();
             new_frame.flags = flags;
-            new_frame.seqno = _send_next_used_seqno;
+            unsigned int seqno = new_frame.seqno = _send_next_used_seqno;
             new_frame.buf.assign(buf, buf + len);
             new_frame.retry = 0;
             new_frame.tm.start();
 
             // send the datagram
-            _callback.callback_send(*this, new_frame.flags, new_frame.seqno, getIdentifier(), &new_frame.buf[0],
+            _callback.callback_send(*this, new_frame.flags, seqno, getIdentifier(), &new_frame.buf[0],
                                     new_frame.buf.size());
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                << "appended datagram with seqno " << new_frame.seqno << " to window " << SEND_WINDOW_STRING
+                << "appended datagram with seqno " << seqno << " to window " << SEND_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
             // increment next sequence number
@@ -527,11 +532,11 @@ namespace dtn {
                     _send_ack_cond.wait(&ts);
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "got ack and window is no longer full, sender of seqno " << new_frame.seqno
+                    << "got ack and window is no longer full, sender of seqno " << seqno
                     << " can be unblocked, new window is " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
             } catch (const ibrcommon::Conditional::ConditionalAbortException &e) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "waiting interrupted (" << e.reason << ") while handling datagram with seqno " << new_frame.seqno
+                    << "waiting interrupted (" << e.reason << ") while handling datagram with seqno " << seqno
                     << " in window " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
                 if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                     handle_ack_timeout(last); // timeout - retransmit the whole window
@@ -539,7 +544,7 @@ namespace dtn {
                     throw;
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "done handling timeouts after handling seqno " << new_frame.seqno << ", new window is "
+                    << "done handling timeouts after handling seqno " << seqno << ", new window is "
                     << SEND_WINDOW_STRING
                     << IBRCOMMON_LOGGER_ENDL;
             }
@@ -553,9 +558,9 @@ namespace dtn {
                 if (_send_window_frames.empty()) return;
 
                 window_frame &front_frame = _send_window_frames.front();
-
+                unsigned int seqno = front_frame.seqno;
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                    << "ack timeout for seqno " << front_frame.seqno << " in window "
+                    << "ack timeout for seqno " << seqno << " in window "
                     << SEND_WINDOW_STRING
                     << ", " << front_frame.retry << " of " << _params.retry_limit << " retries made"
                     << IBRCOMMON_LOGGER_ENDL;
@@ -584,7 +589,7 @@ namespace dtn {
                         _send_ack_cond.wait(&ts);
                     }
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                        << "got acks and window is empty => timed-out datagram with seqno " << front_frame.seqno
+                        << "got acks and window is empty => timed-out datagram with seqno " << seqno
                         << " processed"
                         << IBRCOMMON_LOGGER_ENDL;
                     return; // done
