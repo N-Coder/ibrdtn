@@ -148,7 +148,7 @@ namespace dtn
 		void DatagramConvergenceLayer::queue(const dtn::core::Node &node, const dtn::net::BundleTransfer &job)
 		{
 			// do not queue any new jobs if the convergence layer goes down
-			if (!_running){
+			if (!_running){ // TODO rework the debugging levels for the whole Datagram space
                 IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConvergenceLayer::TAG, 10) << "discarding job for " << node.getEID().getString() << ", not running" << IBRCOMMON_LOGGER_ENDL;
                 return;
             }
@@ -163,7 +163,9 @@ namespace dtn
 			const dtn::core::Node::URI &uri = uri_list.front();
 
 			// some debugging
-			IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConvergenceLayer::TAG, 10) << "job queued for " << node.getEID().getString() << IBRCOMMON_LOGGER_ENDL;
+            IBRCOMMON_LOGGER_DEBUG_TAG(DatagramConvergenceLayer::TAG, 10)
+                << "job " << job.getBundle().toString() << " queued for " << node.getEID().getString()
+                << " via " << uri << IBRCOMMON_LOGGER_ENDL;
 
 			QueueBundle *queue = new QueueBundle(job);
 			queue->uri = uri.value;

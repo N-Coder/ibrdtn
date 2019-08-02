@@ -247,12 +247,12 @@ namespace dtn
 			/**
 			 * True, if the sliding window buffer is exhausted
 			 */
-			bool sw_frames_full();
+			bool SWINDOW_frames_full();
 
 			/**
 			 * Retransmit the whole sliding window buffer on a timeout
 			 */
-			void sw_timeout(bool last);
+			void SWINDOW_handle_timeout(bool last);
 
 			DatagramConnectionCallback &_callback;
 			const std::string _identifier;
@@ -260,8 +260,8 @@ namespace dtn
 			DatagramConnection::Sender _sender;
 
 			ibrcommon::Conditional _ack_cond;
-			unsigned int _last_ack;
-			unsigned int _next_seqno;
+			unsigned int _send_next_used_seqno;
+			unsigned int _recv_next_expected_seqno;
 
 			// stores the head of each connection
 			// the head is hold back until at least a second
@@ -292,7 +292,14 @@ namespace dtn
 				ibrcommon::TimeMeasurement tm;
 			};
 			std::list<window_frame> _sw_frames;
-		};
+            std::string SWINDOW_string();
+
+            size_t SWINDOW_frames_limit() const;
+
+            void stream_send_STOPNWAIT(const char *buf, const Length &len, bool last, char flags, unsigned int seqno);
+
+            void stream_send_SWINDOW(const char *buf, const Length &len, bool last, char flags, unsigned int seqno);
+        };
 	} /* namespace data */
 } /* namespace dtn */
 #endif /* DATAGRAMCONNECTION_H_ */
