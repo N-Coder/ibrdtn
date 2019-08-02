@@ -42,7 +42,7 @@ namespace dtn
 			// set connection parameters
 			_params.max_msg_length = 115;
 			_params.max_seq_numbers = 4;
-			_params.flowcontrol = DatagramService::FLOW_STOPNWAIT;
+            _params.send_window_size = _params.recv_window_size = 1;
 			_params.initial_timeout = 2000;		// initial timeout 2 seconds
 			_params.retry_limit = 5;
 

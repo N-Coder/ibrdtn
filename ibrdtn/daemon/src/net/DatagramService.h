@@ -19,27 +19,18 @@ namespace dtn
 		class DatagramException : public ibrcommon::Exception
 		{
 		public:
-			DatagramException(const std::string &what) : ibrcommon::Exception(what)
-			{};
+		    DatagramException(const std::string &what) : ibrcommon::Exception(what) {};
 
-			virtual ~DatagramException() throw() {};
+            ~DatagramException() throw() override = default;
 		};
 
 		class DatagramService
 		{
 		public:
-			enum FLOWCONTROL
-			{
-				FLOW_NONE = 0,
-				FLOW_STOPNWAIT = 1,
-				FLOW_SLIDING_WINDOW = 2
-			};
-
 			enum HEADER_FLAGS
 			{
 				SEGMENT_FIRST = 0x02,
 				SEGMENT_LAST = 0x01,
-				SEGMENT_MIDDLE = 0x00,
 				NACK_TEMPORARY = 0x04
 			};
 
@@ -48,14 +39,16 @@ namespace dtn
 			public:
 				// default constructor
 				Parameter()
-				: flowcontrol(FLOW_NONE), max_seq_numbers(2), max_msg_length(1024),
+				: max_seq_numbers(2), max_msg_length(1024),
+                  send_window_size(max_seq_numbers / 2), recv_window_size(1),
 				  initial_timeout(50), retry_limit(5) { }
 
 				// destructor
 				virtual ~Parameter() { }
 
-				FLOWCONTROL flowcontrol;
 				unsigned int max_seq_numbers;
+				unsigned int send_window_size;
+				unsigned int recv_window_size;
 				size_t max_msg_length;
 				size_t initial_timeout;
 				size_t retry_limit;

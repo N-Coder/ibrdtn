@@ -13,13 +13,14 @@
 
 namespace dtn {
     namespace net {
+        static const char *const TAG = "BiCEDatagramService";
+
         BiCEDatagramService::BiCEDatagramService(const std::string &path, size_t mtu)
                 : _bindpath(path), _remove_on_exit(false) {
             // set connection parameters
             _params.max_msg_length = mtu - 2;    // minus 2 bytes because we encode seqno and flags into 2 bytes
             _params.max_seq_numbers = 16;        // seqno 0..15
-            _params.flowcontrol = DatagramService::FLOW_SLIDING_WINDOW;
-            _params.initial_timeout = 50;        // 50ms
+            _params.initial_timeout = 200;        // ms
             _params.retry_limit = 5;
         }
 
@@ -90,7 +91,7 @@ namespace dtn {
                 // copy payload to the new buffer
                 ::memcpy(&tmp[2], buf, length);
 
-                IBRCOMMON_LOGGER_DEBUG_TAG("BiCEDatagramService", 20)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
                     << "send() type: " << std::hex << (int) type << "; flags: " << std::hex << (int) flags
                     << "; seqno: " << std::dec << seqno << "; length: " << std::dec << length
                     << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
@@ -122,7 +123,7 @@ namespace dtn {
         void BiCEDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const char *buf,
                                        size_t length) throw(DatagramException) {
             // TODO where to send the "I'm here" broadcasts / discovery announcements / beacons
-            send(type, flags, seqno, "/tmp/serial-wifi", buf, length);
+            send(type, flags, seqno, "/tmp/broadcast", buf, length);
         }
 
         /**
@@ -135,47 +136,59 @@ namespace dtn {
          */
         size_t BiCEDatagramService::recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno,
                                              std::string &address) throw(DatagramException) {
+            while (true) {
+                try {
+                    ibrcommon::socketset readfds;
+                    _vsocket.select(&readfds, NULL, NULL, NULL);
 
-            try {
-                ibrcommon::socketset readfds;
-                _vsocket.select(&readfds, NULL, NULL, NULL);
+                    for (auto iter = readfds.begin(); iter != readfds.end(); ++iter) {
+                        try {
+                            auto &sock = dynamic_cast<ibrcommon::udpsocket &>(**iter);
 
-                for (ibrcommon::socketset::iterator iter = readfds.begin(); iter != readfds.end(); ++iter) {
-                    try {
-                        ibrcommon::udpsocket &sock = dynamic_cast<ibrcommon::udpsocket &>(**iter);
+                            std::vector<char> tmp(length + 2);
+                            ibrcommon::vaddress peeraddr;
+                            size_t ret = sock.recvfrom(&tmp[0], length + 2, 0, peeraddr);
+                            if (ret == 0) {
+                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                                    << "recvfrom() got empty datagram from " << peeraddr.toString()
+                                    << ", discarding" << IBRCOMMON_LOGGER_ENDL;
+                                continue;
+                            } else if (ret == 1) {
+                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                                    << "recvfrom() got datagram with only one byte (0x"
+                                    << std::hex << (uint8_t) tmp[0]
+                                    << ") from " << peeraddr.toString()
+                                    << ", discarding" << IBRCOMMON_LOGGER_ENDL;
+                                continue;
+                            }
 
-                        std::vector<char> tmp(length + 2);
-                        ibrcommon::vaddress peeraddr;
-                        size_t ret = sock.recvfrom(&tmp[0], length + 2, 0, peeraddr);
+                            // first byte is the type
+                            type = tmp[0];
 
-                        // first byte is the type
-                        type = tmp[0];
+                            // second byte is flags (4-bit) + seqno (4-bit)
+                            flags = 0x0f & (tmp[1] >> 4);
+                            seqno = 0x0f & tmp[1];
 
-                        // second byte is flags (4-bit) + seqno (4-bit)
-                        flags = 0x0f & (tmp[1] >> 4);
-                        seqno = 0x0f & tmp[1];
+                            // return the encoded format
+                            address = peeraddr.address();
 
-                        // return the encoded format
-                        address = peeraddr.address();
+                            // copy payload to the destination buffer
+                            ::memcpy(buf, &tmp[2], ret - 2);
 
-                        // copy payload to the destination buffer
-                        ::memcpy(buf, &tmp[2], ret - 2);
+                            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                                << "recvfrom() type: " << std::hex << (int) type << "; flags: " << (int) flags
+                                << "; seqno: " << std::dec << seqno << "; length: " << ret - 2
+                                << "; address: " << peeraddr.toString() << IBRCOMMON_LOGGER_ENDL;
 
-                        IBRCOMMON_LOGGER_DEBUG_TAG("BiCEDatagramService", 20)
-                            << "recvfrom() type: " << std::hex << (int) type << "; flags: " << std::hex << (int) flags
-                            << "; seqno: " << std::dec << seqno << "; length: " << std::dec << ret - 2
-                            << "; address: " << peeraddr.toString() << IBRCOMMON_LOGGER_ENDL;
-
-                        return ret - 2;
-                    } catch (const std::bad_cast &) {}
+                            return ret - 2;
+                        } catch (const std::bad_cast &) {}
+                    }
+                } catch (const ibrcommon::Exception &e) {
+                    std::stringstream ss;
+                    ss << "receive failed: " << e.what();
+                    throw DatagramException(ss.str());
                 }
-            } catch (const ibrcommon::Exception &e) {
-                std::stringstream ss;
-                ss << "receive failed: " << e.what();
-                throw DatagramException(ss.str());
             }
-
-            return 0;
         }
 
         /**

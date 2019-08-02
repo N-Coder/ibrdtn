@@ -39,7 +39,6 @@ namespace dtn
 		class DatagramConvergenceLayer : public dtn::net::ConvergenceLayer, public dtn::daemon::IndependentComponent,
 			public dtn::net::DatagramConnectionCallback, public DiscoveryBeaconHandler, public dtn::core::EventReceiver<dtn::core::NodeEvent>
 		{
-			static const std::string TAG;
 
 		public:
 			enum HEADER_FLAGS
