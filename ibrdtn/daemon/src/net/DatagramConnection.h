@@ -83,7 +83,7 @@ namespace dtn
 			 * @param buf
 			 * @param len
 			 */
-			void data_received(const char &flags, const unsigned int &seqno, const char *buf, const dtn::data::Length &len);
+			void data_received(const char &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len);
 
 			/**
 			 * This method is called by the DatagramCL, if an ACK is received.
@@ -212,9 +212,16 @@ namespace dtn
 				unsigned int retry;
 				ibrcommon::TimeMeasurement tm;
 			};
+			std::list<window_frame> _recv_window_frames;
 			std::list<window_frame> _send_window_frames;
+
             std::string window_to_string(std::list<window_frame> &frames, size_t max_width);
+
             size_t window_width(std::list<window_frame> &frames) const;
+
+            std::list<DatagramConnection::window_frame>::iterator get_recv_window_frame(const unsigned int &for_seqno);
+
+            unsigned int flush_recv_window();
         };
 	} /* namespace data */
 } /* namespace dtn */

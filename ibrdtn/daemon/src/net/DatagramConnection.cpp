@@ -37,6 +37,7 @@
 
 #define NEXT_SEQNO(s) ((s + 1) % _params.max_seq_numbers)
 #define SEND_WINDOW_STRING window_to_string(_send_window_frames, _params.send_window_size)
+#define RECV_WINDOW_STRING window_to_string(_recv_window_frames, _params.recv_window_size)
 
 namespace dtn {
     namespace net {
@@ -242,24 +243,71 @@ namespace dtn {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         void DatagramConnection::data_received(
-                const char &flags, const unsigned int &seqno, const char *buf, const dtn::data::Length &len) {
+                const char &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len) {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame received, flags: " << (int) flags << ", seqno: " << seqno
-                << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
+                << "frame received, flags: " << (int) flags << ", seqno: " << received_seqno
+                << ", len: " << len << " via " << getIdentifier() << " in receive window "
+                << RECV_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
 
-            // TODO handle out-of-order and duplicate ACKs instead of weird RECV_HEAD handling?
             // TODO what if stream on the other side was reset? => drop / flush window depending on first / last markers
 
-            if (_recv_next_expected_seqno != seqno) {
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 15)
-                    << "sequence number received " << seqno << ", expected " << _recv_next_expected_seqno
-                    << " (sending ACK for predecessor of expected again)" << IBRCOMMON_LOGGER_ENDL;
+            const std::list<window_frame>::iterator &frame = get_recv_window_frame(received_seqno);
+            if (frame != _recv_window_frames.end()) {
+                frame->buf.assign(buf, buf + len);
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "inserted received data, new receive window is " << RECV_WINDOW_STRING << ", flushing"
+                    << IBRCOMMON_LOGGER_ENDL;
 
+                unsigned int flushed = flush_recv_window();
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "flushed " << flushed << " frames of received data, new receive window is " << RECV_WINDOW_STRING
+                    << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
             } else {
-                _stream.queue_received_data(buf, len);
-                _recv_next_expected_seqno = NEXT_SEQNO(seqno);
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "frame " << received_seqno << " is not in the current receive window, sending ACK nonetheless"
+                    << IBRCOMMON_LOGGER_ENDL;
             }
-            _callback.callback_ack(*this, _recv_next_expected_seqno, getIdentifier());
+
+            _callback.callback_ack(*this, received_seqno, getIdentifier());
+        }
+
+        std::list<DatagramConnection::window_frame>::iterator
+        DatagramConnection::get_recv_window_frame(const unsigned int &for_seqno) {
+            size_t seqno = _recv_next_expected_seqno;
+            auto it = _recv_window_frames.begin();
+            while (true) {
+                if (it == _recv_window_frames.end()) {
+                    _recv_window_frames.emplace_back();
+                    _recv_window_frames.back().seqno = seqno;
+                } else {
+                    assert(it->seqno == seqno);
+                }
+                if (for_seqno == seqno) {
+                    return it;
+                }
+                if (window_width(_recv_window_frames) >= _params.recv_window_size) {
+                    return _recv_window_frames.end();
+                }
+                seqno = NEXT_SEQNO(seqno);
+                it++;
+            }
+        }
+
+        unsigned int DatagramConnection::flush_recv_window() {
+            unsigned int flushed = 0;
+            while (!_recv_window_frames.empty()) {
+                std::vector<char> &buf = _recv_window_frames.front().buf;
+                if (!buf.empty()) {
+                    flushed++;
+                    _stream.queue_received_data(&buf[0], buf.size());
+                    _recv_next_expected_seqno = NEXT_SEQNO(_recv_next_expected_seqno);
+                    _callback.callback_ack(*this, _recv_next_expected_seqno, getIdentifier());
+                    _recv_window_frames.pop_front();
+                } else {
+                    break;
+                }
+            }
+            return flushed;
         }
 
         void DatagramConnection::Stream::queue_received_data(
