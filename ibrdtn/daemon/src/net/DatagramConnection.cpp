@@ -125,18 +125,21 @@ namespace dtn {
         std::string DatagramConnection::window_to_string(std::list<window_frame> &frames, size_t max_width) {
             std::stringstream ss;
             ss << "{";
+            auto last = frames.end();
+            last--;
             for (auto it = frames.begin(); it != frames.end(); it++) {
                 window_frame &frame = *it;
                 ss << "[" << (uint8_t) frame.flags;
                 ss << " #" << frame.seqno << ", len " << frame.buf.size();
                 ss << " | retry " << frame.retry << ", t ";
                 ss << (frame.tm.getSeconds() * 1000 + frame.tm.getMilliseconds()) << "ms]";
-                if (&frame != &(frames.back())) {
+                if (it != last) {
                     ss << ", ";
                 }
             }
             size_t width = window_width(frames);
             ss << "}(" << frames.size() << "/" << width << "/" << max_width << ")";
+            //assert(frames.size() <= width && width <= max_width);
             if (frames.size() > width || width > max_width) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
                     << "window width violation: " << ss.str() << IBRCOMMON_LOGGER_ENDL;
@@ -262,13 +265,14 @@ namespace dtn {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                     << "flushed " << flushed << " frames of received data, new receive window is " << RECV_WINDOW_STRING
                     << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
+
+                _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
             } else {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                     << "frame " << received_seqno << " is not in the current receive window, sending ACK nonetheless"
                     << IBRCOMMON_LOGGER_ENDL;
+                // TODO handle lost ACK / too big sender window properly
             }
-
-            _callback.callback_ack(*this, received_seqno, getIdentifier());
         }
 
         std::list<DatagramConnection::window_frame>::iterator
@@ -279,10 +283,17 @@ namespace dtn {
                 if (it == _recv_window_frames.end()) {
                     _recv_window_frames.emplace_back();
                     _recv_window_frames.back().seqno = seqno;
-                } else {
-                    assert(it->seqno == seqno);
+                    it--; // we're still 1 past the end, so step back to get to the inserted / last element
+                }
+                //assert(it->seqno == seqno);
+                if (it->seqno != seqno) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
+                        << "looking for " << for_seqno << " in " << RECV_WINDOW_STRING
+                        << "; element at position for seqno " << seqno << " claims to have seqno " << it->seqno
+                        << IBRCOMMON_LOGGER_ENDL;
                 }
                 if (for_seqno == seqno) {
+                    assert(it != _recv_window_frames.end());
                     return it;
                 }
                 if (window_width(_recv_window_frames) >= _params.recv_window_size) {
@@ -297,6 +308,13 @@ namespace dtn {
             unsigned int flushed = 0;
             while (!_recv_window_frames.empty()) {
                 std::vector<char> &buf = _recv_window_frames.front().buf;
+                //assert(_recv_window_frames.front().seqno == _recv_next_expected_seqno);
+                if (_recv_window_frames.front().seqno != _recv_next_expected_seqno) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
+                        << "flushing " << RECV_WINDOW_STRING
+                        << "; element at front claims to have seqno " << _recv_window_frames.front().seqno
+                        << IBRCOMMON_LOGGER_ENDL;
+                }
                 if (!buf.empty()) {
                     flushed++;
                     _stream.queue_received_data(&buf[0], buf.size());
