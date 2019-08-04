@@ -39,12 +39,10 @@ namespace dtn
 		LOWPANDatagramService::LOWPANDatagramService(const ibrcommon::vinterface &iface, uint16_t panid)
 		 : _panid(panid), _iface(iface)
 		{
-			// set connection parameters
 			_params.max_msg_length = 115;
-			_params.max_seq_numbers = 4;
+            _params.max_seq_numbers = FRAME_SEQNO_SHORT_MAX;
             _params.send_window_size = _params.recv_window_size = 1;
 			_params.initial_timeout = 2000;		// initial timeout 2 seconds
-			_params.retry_limit = 5;
 
 			// convert the panid into a string
 			std::stringstream ss;
@@ -92,7 +90,7 @@ namespace dtn
 		 * @param buf The buffer to send.
 		 * @param length The number of available bytes in the buffer.
 		 */
-		void LOWPANDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const std::string &identifier, const char *buf, size_t length) throw (DatagramException)
+		void LOWPANDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const std::string &identifier, const char *buf, size_t length) throw (DatagramException)
 		{
 			try {
 				if (length > _params.max_msg_length)
@@ -113,29 +111,14 @@ namespace dtn
 				std::vector<char> tmp(length + 1);
 
 				// encode the header (1 byte)
-				tmp[0] = 0;
-
-				// compat: 00
-
-				// type: 01 = DATA, 10 = DISCO, 11 = ACK, 00 = NACK
-				if (type == DatagramConvergenceLayer::HEADER_SEGMENT) tmp[0] |= 0x01 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_BROADCAST) tmp[0] |= 0x02 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_ACK) tmp[0] |= 0x03 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_NACK) tmp[0] |= 0x00 << 4;
-
-				// seq.no: xx (2 bit)
-				tmp[0] |= static_cast<char>((0x03 & seqno) << 2);
-
-				// flags: 10 = first, 00 = middle, 01 = last, 11 = both
-				if (flags & DatagramService::SEGMENT_FIRST) tmp[0] |= 0x2;
-				if (flags & DatagramService::SEGMENT_LAST) tmp[0] |= 0x1;
+                DatagramService::write_header_short(&tmp[0], type, flags, seqno);
 
 				if (length > 0) {
 					// copy payload to the new buffer
 					::memcpy(&tmp[1], buf, length);
 				}
 
-				IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "sendto() type: " << std::hex << (int)type << "; flags: " << std::hex << (int)flags << "; seqno: " << seqno << "; address: " << identifier << IBRCOMMON_LOGGER_ENDL;
+				IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "sendto() type: " << std::hex << (int)type << "; flags: " << std::hex << flags << "; seqno: " << seqno << "; address: " << identifier << IBRCOMMON_LOGGER_ENDL;
 
 				// send converted line
 				sock.sendto(&tmp[0], length + 1, 0, destaddr);
@@ -149,7 +132,7 @@ namespace dtn
 		 * @param buf The buffer to send.
 		 * @param length The number of available bytes in the buffer.
 		 */
-		void LOWPANDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException)
+		void LOWPANDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException)
 		{
 			try {
 				if (length > _params.max_msg_length)
@@ -166,22 +149,7 @@ namespace dtn
 				std::vector<char> tmp(length + 1);
 
 				// encode the header (1 byte)
-				tmp[0] = 0;
-
-				// compat: 00
-
-				// type: 01 = DATA, 10 = DISCO, 11 = ACK, 00 = NACK
-				if (type == DatagramConvergenceLayer::HEADER_SEGMENT) tmp[0] |= 0x01 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_BROADCAST) tmp[0] |= 0x02 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_ACK) tmp[0] |= 0x03 << 4;
-				else if (type == DatagramConvergenceLayer::HEADER_NACK) tmp[0] |= 0x00 << 4;
-
-				// seq.no: xx (2 bit)
-				tmp[0] |= static_cast<char>((0x03 & seqno) << 2);
-
-				// flags: 10 = first, 00 = middle, 01 = last, 11 = both
-				if (flags & DatagramService::SEGMENT_FIRST) tmp[0] |= 0x2;
-				if (flags & DatagramService::SEGMENT_LAST) tmp[0] |= 0x1;
+                DatagramService::write_header_short(&tmp[0], type, flags, seqno);
 
 				if (length > 0) {
 					// copy payload to the new buffer
@@ -191,7 +159,7 @@ namespace dtn
 				// disable auto-ack feature for broadcast
 				sock.setAutoAck(false);
 
-				IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "sendto() type: " << std::hex << (int)type << "; flags: " << std::hex << (int)flags << "; seqno: " << seqno << "; address: broadcast" << IBRCOMMON_LOGGER_ENDL;
+				IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "sendto() type: " << std::hex << (int)type << "; flags: " << std::hex << flags << "; seqno: " << seqno << "; address: broadcast" << IBRCOMMON_LOGGER_ENDL;
 
 				// send converted line
 				sock.sendto(&tmp[0], length + 1, 0, _addr_broadcast);
@@ -211,7 +179,7 @@ namespace dtn
 		 * @throw If the receive call failed for any reason, an DatagramException is thrown.
 		 * @return The number of received bytes.
 		 */
-		size_t LOWPANDatagramService::recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno, std::string &address) throw (DatagramException)
+		size_t LOWPANDatagramService::recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno, std::string &address) throw (DatagramException)
 		{
 			try {
 				ibrcommon::socketset readfds;
@@ -229,38 +197,7 @@ namespace dtn
 					size_t ret = sock.recvfrom(&tmp[0], length + 1, 0, fromaddr);
 
 					// decode the header (1 byte)
-					// IGNORE: compat: 00
-
-					// reset flags to zero
-					flags = 0;
-
-					// type: 01 = DATA, 10 = DISCO, 11 = ACK, 00 = NACK
-					switch (tmp[0] & (0x03 << 4)) {
-					case (0x01 << 4):
-						type = DatagramConvergenceLayer::HEADER_SEGMENT;
-
-						// flags: 10 = first, 00 = middle, 01 = last, 11 = both
-						if (tmp[0] & 0x02) flags |= DatagramService::SEGMENT_FIRST;
-						if (tmp[0] & 0x01) flags |= DatagramService::SEGMENT_LAST;
-
-						break;
-					case (0x02 << 4):
-						type = DatagramConvergenceLayer::HEADER_BROADCAST;
-						break;
-					case (0x03 << 4):
-						type = DatagramConvergenceLayer::HEADER_ACK;
-						break;
-					default:
-						type = DatagramConvergenceLayer::HEADER_NACK;
-
-						// flags: 10 = temporary
-						if (tmp[0] & 0x02) flags |= DatagramService::NACK_TEMPORARY;
-
-						break;
-					}
-
-					// seq.no: xx (2 bit)
-					seqno = (tmp[0] & (0x03 << 2)) >> 2;
+                    DatagramService::read_header_long(&tmp[0], type, flags, seqno);
 
 					if (ret > 1) {
 						// copy payload into the buffer
@@ -270,7 +207,7 @@ namespace dtn
 					// encode into the right format
 					address = LOWPANDatagramService::encode(fromaddr);
 
-					IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "recvfrom() type: " << std::hex << (int)type << "; flags: " << std::hex << (int)flags << "; seqno: " << seqno << "; address: " << address << IBRCOMMON_LOGGER_ENDL;
+					IBRCOMMON_LOGGER_DEBUG_TAG(LOWPANDatagramService::TAG, 20) << "recvfrom() type: " << std::hex << (int)type << "; flags: " << std::hex << flags << "; seqno: " << seqno << "; address: " << address << IBRCOMMON_LOGGER_ENDL;
 
 					return ret - 1;
 				}

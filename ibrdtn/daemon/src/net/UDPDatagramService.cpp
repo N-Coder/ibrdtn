@@ -39,11 +39,10 @@ namespace dtn {
 
         UDPDatagramService::UDPDatagramService(const ibrcommon::vinterface &iface, int port, size_t mtu)
                 : _msock(NULL), _iface(iface), _bind_port(port) {
-            // set connection parameters
-            _params.max_msg_length = mtu - 2;    // minus 2 bytes because we encode seqno and flags into 2 bytes
-            _params.max_seq_numbers = 16;        // seqno 0..15
-            _params.initial_timeout = 50;        // initial timeout 50ms
-            _params.retry_limit = 5;
+            _params.max_msg_length = mtu - FRAME_HEADER_LONG_LENGTH;
+            _params.max_seq_numbers = FRAME_SEQNO_LONG_MAX;
+            _params.send_window_size = FRAME_SEQNO_LONG_MAX / 2;
+            _params.recv_window_size = FRAME_SEQNO_LONG_MAX / 2;
         }
 
         UDPDatagramService::~UDPDatagramService() {
@@ -127,12 +126,11 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void UDPDatagramService::send(const char &type, const char &flags, const unsigned int &seqno,
-                                      const std::string &identifier, const char *buf,
-                                      size_t length) throw(DatagramException) {
+        void UDPDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
+                                      const std::string &address, const char *buf, size_t length) throw(DatagramException) {
             // decode address identifier
             ibrcommon::vaddress destination;
-            UDPDatagramService::decode(identifier, destination);
+            UDPDatagramService::decode(address, destination);
 
             // forward to actually send method
             send(type, flags, seqno, destination, buf, length);
@@ -143,30 +141,26 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void UDPDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const char *buf,
+        void UDPDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf,
                                       size_t length) throw(DatagramException) {
             // forward to actually send method using the broadcast address
             send(type, flags, seqno, BROADCAST_ADDR, buf, length);
         }
 
-        void UDPDatagramService::send(const char &type, const char &flags, const unsigned int &seqno,
+        void UDPDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
                                       const ibrcommon::vaddress &destination, const char *buf,
                                       size_t length) throw(DatagramException) {
             try {
                 std::vector<char> tmp(length + 2);
 
-                // add a 2-byte header - type of frame first
-                tmp[0] = type;
-
-                // flags (4-bit) + seqno (4-bit)
-                tmp[1] = static_cast<char>((0xf0 & (flags << 4)) | (0x0f & seqno));
+                DatagramService::write_header_long(&tmp[0], type, flags, seqno);
 
                 // copy payload to the new buffer
                 ::memcpy(&tmp[2], buf, length);
 
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20) << "send() type: " << std::hex << (int) type << "; flags: "
-                                                    << std::hex << (int) flags << "; seqno: " << std::dec << seqno
-                                                    << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                    << "send() type: " << std::hex << type << "; flags: " << std::hex << flags << "; seqno: "
+                    << std::dec << seqno << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
 
                 // create vaddress
                 ibrcommon::socketset sockset = _vsocket.getAll();
@@ -195,7 +189,7 @@ namespace dtn {
          * @throw If the receive call failed for any reason, an DatagramException is thrown.
          * @return The number of received bytes.
          */
-        size_t UDPDatagramService::recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno,
+        size_t UDPDatagramService::recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno,
                                             std::string &address) throw(DatagramException) {
             while (true) {
                 try {
@@ -223,12 +217,7 @@ namespace dtn {
                                 continue;
                             }
 
-                            // first byte is the type
-                            type = tmp[0];
-
-                            // second byte is flags (4-bit) + seqno (4-bit)
-                            flags = 0x0f & (tmp[1] >> 4);
-                            seqno = 0x0f & tmp[1];
+                            DatagramService::read_header_long(&tmp[0], type, flags, seqno);
 
                             // return the encoded format
                             address = UDPDatagramService::encode(peeraddr);
@@ -238,7 +227,7 @@ namespace dtn {
 
                             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
                                 << "recvfrom() type: " << std::hex << (int) type << "; flags: " << std::hex
-                                << (int) flags << "; seqno: " << seqno << "; address: " << peeraddr.toString()
+                                << flags << "; seqno: " << seqno << "; address: " << peeraddr.toString()
                                 << IBRCOMMON_LOGGER_ENDL;
 
                             return ret - 2;

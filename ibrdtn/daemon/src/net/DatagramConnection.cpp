@@ -131,7 +131,7 @@ namespace dtn {
             last--;
             for (auto it = frames.begin(); it != frames.end(); it++) {
                 window_frame &frame = *it;
-                ss << "[" << (uint8_t) frame.flags;
+                ss << "[" << frame.flags;
                 ss << " #" << frame.seqno << ", len " << frame.buf.size();
                 ss << " | retry " << frame.retry << ", t ";
                 ss << (frame.tm.getSeconds() * 1000 + frame.tm.getMilliseconds()) << "ms]";
@@ -208,7 +208,7 @@ namespace dtn {
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-        void DatagramConnection::nack_received(const unsigned int &seqno, const bool temporary) {
+        void DatagramConnection::nack_received(const unsigned int &seqno) {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20) << "nack received for seqno " << seqno << IBRCOMMON_LOGGER_ENDL;
         }
 
@@ -240,9 +240,10 @@ namespace dtn {
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
         void DatagramConnection::data_received(
-                const char &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len) {
+                const DatagramService::FLAG_BITS &flags, const unsigned int &received_seqno, const char *buf,
+                const dtn::data::Length &len) {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame received, flags: " << (int) flags << ", seqno: " << received_seqno
+                << "frame received, flags: " << flags << ", seqno: " << received_seqno
                 << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
@@ -549,10 +550,10 @@ namespace dtn {
 
         void DatagramConnection::send_serialized_stream_data(
                 const char *buf, const dtn::data::Length &len, bool last) throw(DatagramException) {
-            char flags = 0;
+            DatagramService::FLAG_BITS flags = 0;
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame to send, flags: " << (int) flags << ", seqno: " << _send_next_used_seqno
+                << "frame to send, flags: " <<  flags << ", seqno: " << _send_next_used_seqno
                 << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
             // lock the ACK variables and frame window

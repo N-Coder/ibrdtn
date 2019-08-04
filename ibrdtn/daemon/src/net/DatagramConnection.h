@@ -43,7 +43,7 @@ namespace dtn
 		{
 		public:
 			virtual ~DatagramConnectionCallback() = default;;
-			virtual void callback_send(DatagramConnection &connection, const char &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException) = 0;
+			virtual void callback_send(DatagramConnection &connection, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException) = 0;
 			virtual void callback_ack(DatagramConnection &connection, const unsigned int &seqno, const std::string &destination) throw (DatagramException) = 0;
 			virtual void callback_nack(DatagramConnection &connection, const unsigned int &seqno, const std::string &destination) throw (DatagramException) = 0;
 
@@ -83,7 +83,7 @@ namespace dtn
 			 * @param buf
 			 * @param len
 			 */
-			void data_received(const char &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len);
+			void data_received(const DatagramService::FLAG_BITS &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len);
 
 			/**
 			 * This method is called by the DatagramCL, if an ACK is received.
@@ -94,7 +94,7 @@ namespace dtn
 			/**
 			 * This method is called by the DatagramCL, if an permanent NACK is received.
 			 */
-			void nack_received(const unsigned int &seqno, bool temporary);
+            void nack_received(const unsigned int &seqno);
 
 		private:
 			class Stream : public std::basic_streambuf<char, std::char_traits<char> >, public std::iostream
@@ -206,7 +206,7 @@ namespace dtn
 
 				virtual ~window_frame() = default;
 
-				char flags;
+				DatagramService::FLAG_BITS flags;
 				unsigned int seqno;
 				std::vector<char> buf;
 				unsigned int retry;

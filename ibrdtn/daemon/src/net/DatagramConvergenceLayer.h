@@ -41,15 +41,6 @@ namespace dtn
 		{
 
 		public:
-			enum HEADER_FLAGS
-			{
-				HEADER_UNKOWN = 0,
-				HEADER_BROADCAST = 1,
-				HEADER_SEGMENT = 2,
-				HEADER_ACK = 4,
-				HEADER_NACK = 8
-			};
-
 			DatagramConvergenceLayer(DatagramService *ds);
 			virtual ~DatagramConvergenceLayer();
 
@@ -95,7 +86,7 @@ namespace dtn
 			 * @param buf
 			 * @param len
 			 */
-			void callback_send(DatagramConnection &connection, const char &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException);
+			void callback_send(DatagramConnection &connection, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException);
 
 			void callback_ack(DatagramConnection &connection, const unsigned int &seqno, const std::string &destination) throw (DatagramException);
 
@@ -151,7 +142,7 @@ namespace dtn
 
 				std::string address;
 				unsigned int seqno;
-				char flags;
+                DatagramService::FLAG_BITS flags;
 				std::vector<char> data;
 				size_t len;
 			};
@@ -176,12 +167,11 @@ namespace dtn
 
 			class NackReceived : public Action {
 			public:
-				NackReceived() : seqno(0), temporary(false) {};
+				NackReceived() : seqno(0) {};
 				virtual ~NackReceived() {};
 
 				std::string address;
 				unsigned int seqno;
-				bool temporary;
 			};
 
 			class QueueBundle : public Action {
@@ -252,7 +242,7 @@ namespace dtn
 			double _stats_rtt;
 			size_t _stats_retries;
 			size_t _stats_failure;
-		};
+        };
 	} /* namespace data */
 } /* namespace dtn */
 #endif /* DATAGRAMCONVERGENCELAYER_H_ */

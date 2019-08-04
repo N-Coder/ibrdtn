@@ -106,14 +106,14 @@ namespace dtn {
             return _service->getProtocol();
         }
 
-        void DatagramConvergenceLayer::callback_send(DatagramConnection &, const char &flags, const unsigned int &seqno,
+        void DatagramConvergenceLayer::callback_send(DatagramConnection &, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
                                                      const std::string &destination, const char *buf,
                                                      const dtn::data::Length &len) throw(DatagramException) {
             // only on sender at once
             ibrcommon::MutexLock l(_send_lock);
 
             // forward the send request to DatagramService
-            _service->send(HEADER_SEGMENT, flags, seqno, destination, buf, len);
+            _service->send(DatagramService::FRAME_SEGMENT, flags, seqno, destination, buf, len);
 
             // traffic monitoring
             _stats_out += len;
@@ -125,7 +125,7 @@ namespace dtn {
             ibrcommon::MutexLock l(_send_lock);
 
             // forward the send request to DatagramService
-            _service->send(HEADER_ACK, 0, seqno, destination, NULL, 0);
+            _service->send(DatagramService::FRAME_ACK, 0, seqno, destination, NULL, 0);
         }
 
         void DatagramConvergenceLayer::callback_nack(DatagramConnection &, const unsigned int &seqno,
@@ -134,7 +134,7 @@ namespace dtn {
             ibrcommon::MutexLock l(_send_lock);
 
             // forward the send request to DatagramService
-            _service->send(HEADER_NACK, 0, seqno, destination, NULL, 0);
+            _service->send(DatagramService::FRAME_NACK, 0, seqno, destination, NULL, 0);
         }
 
         void DatagramConvergenceLayer::queue(const dtn::core::Node &node, const dtn::net::BundleTransfer &job) {
@@ -267,7 +267,7 @@ namespace dtn {
                 ibrcommon::MutexLock l(_send_lock);
 
                 // forward the send request to DatagramService
-                _service->send(HEADER_BROADCAST, 0, 0, ss.str().c_str(), static_cast<dtn::data::Length>(len));
+                _service->send(DatagramService::FRAME_BROADCAST, 0, 0, ss.str().c_str(), static_cast<dtn::data::Length>(len));
             } catch (const DatagramException &) {
                 // ignore any send failure
             };
@@ -277,8 +277,8 @@ namespace dtn {
             size_t maxlen = _service->getParameter().max_msg_length;
             std::string address;
             unsigned int seqno = 0;
-            char flags = 0;
-            char type = 0;
+            DatagramService::FLAG_BITS flags;
+            DatagramService::FRAME_TYPE type;
             std::vector<char> data(maxlen);
             size_t len = 0;
 
@@ -305,7 +305,7 @@ namespace dtn {
                     << "receive() Address: " << address << IBRCOMMON_LOGGER_ENDL;
 
                 // Check for extended header and retrieve if available
-                if (type == HEADER_BROADCAST) {
+                if (type == DatagramService::FRAME_BROADCAST) {
                     try {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
                             << "receive() Announcement received" << IBRCOMMON_LOGGER_ENDL;
@@ -336,7 +336,7 @@ namespace dtn {
                     }
 
                     continue;
-                } else if (type == HEADER_SEGMENT) {
+                } else if (type == DatagramService::FRAME_SEGMENT) {
                     SegmentReceived *seg = new SegmentReceived(maxlen);
                     seg->address = address;
                     seg->seqno = seqno;
@@ -344,16 +344,15 @@ namespace dtn {
                     seg->data = data;
                     seg->len = len;
                     _action_queue.push(seg);
-                } else if (type == HEADER_ACK) {
+                } else if (type == DatagramService::FRAME_ACK) {
                     AckReceived *ack = new AckReceived();
                     ack->address = address;
                     ack->seqno = seqno;
                     _action_queue.push(ack);
-                } else if (type == HEADER_NACK) {
+                } else if (type == DatagramService::FRAME_NACK) {
                     NackReceived *nack = new NackReceived();
                     nack->address = address;
                     nack->seqno = seqno;
-                    nack->temporary = flags & DatagramService::NACK_TEMPORARY;
                     _action_queue.push(nack);
                 }
             }
@@ -395,7 +394,7 @@ namespace dtn {
                             // Connection instance for this address
                             DatagramConnection &connection = getConnection(nack.address, false);
                             // Decide in which queue to write based on the src address
-                            connection.nack_received(nack.seqno, nack.temporary);
+                            connection.nack_received(nack.seqno);
                         } catch (const ConnectionNotAvailableException &ex) {
                             // connection does not exists - ignore the NACK
                         }

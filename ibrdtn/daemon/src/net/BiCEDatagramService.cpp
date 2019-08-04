@@ -17,12 +17,10 @@ namespace dtn {
 
         BiCEDatagramService::BiCEDatagramService(const std::string &path, size_t mtu)
                 : _bindpath(path), _remove_on_exit(false) {
-            // set connection parameters
-            _params.max_msg_length = mtu - 2;    // minus 2 bytes because we encode seqno and flags into 2 bytes
-            _params.max_seq_numbers = 16;        // seqno 0..15
-            _params.initial_timeout = 200;        // ms
-            _params.retry_limit = 5;
-            _params.send_window_size = 8;
+            _params.max_msg_length = mtu - FRAME_HEADER_LONG_LENGTH;
+            _params.max_seq_numbers = FRAME_SEQNO_LONG_MAX;
+            _params.send_window_size = FRAME_SEQNO_LONG_MAX / 2;
+            _params.recv_window_size = FRAME_SEQNO_LONG_MAX / 2;
         }
 
         BiCEDatagramService::~BiCEDatagramService() {
@@ -75,7 +73,7 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void BiCEDatagramService::send(const char &type, const char &flags, const unsigned int &seqno,
+        void BiCEDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
                                        const std::string &identifier, const char *buf,
                                        size_t length) throw(DatagramException) {
             ibrcommon::vaddress destination(identifier, "", ibrcommon::vaddress::SCOPE_LOCAL, AF_UNIX);
@@ -83,17 +81,13 @@ namespace dtn {
             try {
                 std::vector<char> tmp(length + 2);
 
-                // add a 2-byte header - type of frame first
-                tmp[0] = type;
-
-                // flags (4-bit) + seqno (4-bit)
-                tmp[1] = static_cast<char>((0xf0 & (flags << 4)) | (0x0f & seqno));
+                DatagramService::write_header_long(&tmp[0], type, flags, seqno);
 
                 // copy payload to the new buffer
                 ::memcpy(&tmp[2], buf, length);
 
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                    << "send() type: " << std::hex << (int) type << "; flags: " << std::hex << (int) flags
+                    << "send() type: " << std::hex << (int) type << "; flags: " << std::hex << flags
                     << "; seqno: " << std::dec << seqno << "; length: " << std::dec << length
                     << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
 
@@ -121,7 +115,7 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void BiCEDatagramService::send(const char &type, const char &flags, const unsigned int &seqno, const char *buf,
+        void BiCEDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf,
                                        size_t length) throw(DatagramException) {
             // TODO where to send the "I'm here" broadcasts / discovery announcements / beacons
             send(type, flags, seqno, "/tmp/broadcast", buf, length);
@@ -135,7 +129,7 @@ namespace dtn {
          * @throw If the receive call failed for any reason, an DatagramException is thrown.
          * @return The number of received bytes.
          */
-        size_t BiCEDatagramService::recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno,
+        size_t BiCEDatagramService::recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno,
                                              std::string &address) throw(DatagramException) {
             while (true) {
                 try {
@@ -163,12 +157,7 @@ namespace dtn {
                                 continue;
                             }
 
-                            // first byte is the type
-                            type = tmp[0];
-
-                            // second byte is flags (4-bit) + seqno (4-bit)
-                            flags = 0x0f & (tmp[1] >> 4);
-                            seqno = 0x0f & tmp[1];
+                            DatagramService::read_header_long(&tmp[0], type, flags, seqno);
 
                             // return the encoded format
                             address = peeraddr.address();
@@ -177,7 +166,7 @@ namespace dtn {
                             ::memcpy(buf, &tmp[2], ret - 2);
 
                             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                                << "recvfrom() type: " << std::hex << (int) type << "; flags: " << (int) flags
+                                << "recvfrom() type: " << std::hex << (int) type << "; flags: " << flags
                                 << "; seqno: " << std::dec << seqno << "; length: " << ret - 2
                                 << "; address: " << peeraddr.toString() << IBRCOMMON_LOGGER_ENDL;
 

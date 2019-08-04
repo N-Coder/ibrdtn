@@ -55,14 +55,14 @@ namespace dtn
 			 * @param buf The buffer to send.
 			 * @param length The number of available bytes in the buffer.
 			 */
-			virtual void send(const char &type, const char &flags, const unsigned int &seqno, const std::string &address, const char *buf, size_t length) throw (DatagramException);
+			virtual void send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const std::string &address, const char *buf, size_t length) throw (DatagramException);
 
 			/**
 			 * Send the payload as datagram to all neighbors (broadcast)
 			 * @param buf The buffer to send.
 			 * @param length The number of available bytes in the buffer.
 			 */
-			virtual void send(const char &type, const char &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException);
+			virtual void send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException);
 
 			/**
 			 * Receive an incoming datagram.
@@ -72,7 +72,7 @@ namespace dtn
 			 * @throw If the receive call failed for any reason, an DatagramException is thrown.
 			 * @return The number of received bytes.
 			 */
-			virtual size_t recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno, std::string &address) throw (DatagramException);
+			virtual size_t recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno, std::string &address) throw (DatagramException);
 
 			/**
 			 * Get the service description for this convergence layer. This
