@@ -28,16 +28,18 @@
 
 #include <ibrcommon/TimeMeasurement.h>
 #include <ibrcommon/Logger.h>
-#include <string.h>
 
 #include <iomanip>
 #include <cassert>
+#include <cstring>
 
 #define AVG_RTT_WEIGHT 0.875
 
 #define NEXT_SEQNO(s) ((s + 1) % _params.max_seq_numbers)
-#define SEND_WINDOW_STRING window_to_string(_send_window_frames, _params.send_window_size)
-#define RECV_WINDOW_STRING window_to_string(_recv_window_frames, _params.recv_window_size)
+#define SEND_WINDOW_STRING "send window " << window_to_string(_send_window_frames, _params.send_window_size) \
+    << ">" << _send_next_used_seqno
+#define RECV_WINDOW_STRING "receive window " << _recv_next_expected_seqno << "<" \
+    << window_to_string(_recv_window_frames, _params.recv_window_size)
 
 namespace dtn {
     namespace net {
@@ -222,25 +224,17 @@ namespace dtn {
 
                     _send_window_frames.erase(itr);
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                        << "received ACK " << received_seqno << ", new window is " << SEND_WINDOW_STRING
-                        << IBRCOMMON_LOGGER_ENDL;
+                        << "received ACK " << received_seqno << ", new " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
 
                     _send_ack_cond.signal(true);
                     return;
                 }
             }
 
-            // TODO handle double ACK
-            if (_send_window_frames.empty()) {
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "received ACK " << received_seqno << " while window is empty, discarding"
-                    << IBRCOMMON_LOGGER_ENDL;
-            } else {
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "received ACK " << received_seqno << " which is not in window "
-                    << SEND_WINDOW_STRING << ", discarding"
-                    << IBRCOMMON_LOGGER_ENDL;
-            }
+            // TODO handle double ACK by resending according frame?
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+                << "received ACK " << received_seqno << " which is not in " << SEND_WINDOW_STRING << ", discarding"
+                << IBRCOMMON_LOGGER_ENDL;
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -249,8 +243,8 @@ namespace dtn {
                 const char &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len) {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                 << "frame received, flags: " << (int) flags << ", seqno: " << received_seqno
-                << ", len: " << len << " via " << getIdentifier() << " in receive window "
-                << RECV_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
+                << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
+                << IBRCOMMON_LOGGER_ENDL;
 
             // TODO what if stream on the other side was reset? => drop / flush window depending on first / last markers
 
@@ -258,18 +252,18 @@ namespace dtn {
             if (frame != _recv_window_frames.end()) {
                 frame->buf.assign(buf, buf + len);
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "inserted received data, new receive window is " << RECV_WINDOW_STRING << ", flushing"
+                    << "inserted received data, new " << RECV_WINDOW_STRING << ", flushing"
                     << IBRCOMMON_LOGGER_ENDL;
 
                 unsigned int flushed = flush_recv_window();
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "flushed " << flushed << " frames of received data, new receive window is " << RECV_WINDOW_STRING
+                    << "flushed " << flushed << " frames of received data, new " << RECV_WINDOW_STRING
                     << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
 
                 _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
             } else {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "frame " << received_seqno << " is not in the current receive window, sending ACK nonetheless"
+                    << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
                     << IBRCOMMON_LOGGER_ENDL;
                 // TODO handle lost ACK / too big sender window properly
             }
@@ -579,7 +573,7 @@ namespace dtn {
                                     new_frame.buf.size());
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                << "appended datagram with seqno " << seqno << " to window " << SEND_WINDOW_STRING
+                << "appended datagram with seqno " << seqno << " to " << SEND_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
             // increment next sequence number
@@ -598,19 +592,19 @@ namespace dtn {
                     _send_ack_cond.wait(&ts);
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "got ack and window is no longer full, sender of seqno " << seqno
-                    << " can be unblocked, new window is " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
+                    << "got ack and send window is no longer full, sender of seqno " << seqno
+                    << " can be unblocked, new " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
             } catch (const ibrcommon::Conditional::ConditionalAbortException &e) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                     << "waiting interrupted (" << e.reason << ") while handling datagram with seqno " << seqno
-                    << " in window " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
+                    << " in " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
                 if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                     handle_ack_timeout(last); // timeout - retransmit the whole window
                 } else {
                     throw;
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                    << "done handling timeouts after handling seqno " << seqno << ", new window is "
+                    << "done handling timeouts after handling seqno " << seqno << ", new "
                     << SEND_WINDOW_STRING
                     << IBRCOMMON_LOGGER_ENDL;
             }
@@ -626,8 +620,7 @@ namespace dtn {
                 window_frame &front_frame = _send_window_frames.front();
                 unsigned int seqno = front_frame.seqno;
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                    << "ack timeout for seqno " << seqno << " in window "
-                    << SEND_WINDOW_STRING
+                    << "ack timeout for seqno " << seqno << " in " << SEND_WINDOW_STRING
                     << ", " << front_frame.retry << " of " << _params.retry_limit << " retries made"
                     << IBRCOMMON_LOGGER_ENDL;
 
@@ -651,11 +644,11 @@ namespace dtn {
 
                 try {
                     // wait until all frames are flushed after the ack timeout occured
-                    while (!_send_window_frames.empty()) {
+                    while (!_send_window_frames.empty()) { // TODO we could use the same condition as for usual sending
                         _send_ack_cond.wait(&ts);
                     }
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
-                        << "got acks and window is empty => timed-out datagram with seqno " << seqno
+                        << "got acks and send window is empty => timed-out datagram with seqno " << seqno
                         << " processed"
                         << IBRCOMMON_LOGGER_ENDL;
                     return; // done
