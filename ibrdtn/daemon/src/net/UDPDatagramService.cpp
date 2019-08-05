@@ -41,8 +41,8 @@ namespace dtn {
                 : _msock(NULL), _iface(iface), _bind_port(port) {
             _params.max_msg_length = mtu - FRAME_HEADER_LONG_LENGTH;
             _params.max_seq_numbers = FRAME_SEQNO_LONG_MAX;
-            _params.send_window_size = FRAME_SEQNO_LONG_MAX / 2;
-            _params.recv_window_size = FRAME_SEQNO_LONG_MAX / 2;
+            _params.send_window_size = 8;
+            _params.recv_window_size = 8;
         }
 
         UDPDatagramService::~UDPDatagramService() {
