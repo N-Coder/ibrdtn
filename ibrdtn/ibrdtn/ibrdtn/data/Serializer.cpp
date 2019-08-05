@@ -663,12 +663,8 @@ namespace dtn
                 throw dtn::InvalidDataException("Stream went bad before new bundle could be read.");
             } else if (version != dtn::data::BUNDLE_VERSION) {
                 std::stringstream ss;
-                ss << "Bundle version (0x"
-                   << std::hex << std::uppercase << std::setfill('0') << std::setw(2)
-                   << static_cast<uint8_t>(version)
-                   << ") differs from ours (0x"
-                   << static_cast<uint8_t>(dtn::data::BUNDLE_VERSION)
-                   << ").";
+                ss << "Bundle version (" << SS_HEX(version) << ") differs from ours ("
+                   << SS_HEX(dtn::data::BUNDLE_VERSION) << ").";
                 throw dtn::InvalidProtocolException(ss.str());
             }
 

@@ -159,8 +159,9 @@ namespace dtn {
                 ::memcpy(&tmp[2], buf, length);
 
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                    << "send() type: " << std::hex << type << "; flags: " << std::hex << flags << "; seqno: "
-                    << std::dec << seqno << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
+                    << "send() "
+                    << packet_to_string(type, flags, seqno, buf, length, destination.toString())
+                    << IBRCOMMON_LOGGER_ENDL;
 
                 // create vaddress
                 ibrcommon::socketset sockset = _vsocket.getAll();
@@ -211,7 +212,7 @@ namespace dtn {
                             } else if (ret == 1) {
                                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
                                     << "recvfrom() got datagram with only one byte (0x"
-                                    << std::hex << (uint8_t) tmp[0]
+                                    << std::hex << (int) tmp[0]
                                     << ") from " << peeraddr.toString()
                                     << ", discarding" << IBRCOMMON_LOGGER_ENDL;
                                 continue;
@@ -226,8 +227,8 @@ namespace dtn {
                             ::memcpy(buf, &tmp[2], ret - 2);
 
                             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                                << "recvfrom() type: " << std::hex << (int) type << "; flags: " << std::hex
-                                << flags << "; seqno: " << seqno << "; address: " << peeraddr.toString()
+                                << "recvfrom() "
+                                << packet_to_string(type, flags, seqno, buf, ret - 2, peeraddr.toString())
                                 << IBRCOMMON_LOGGER_ENDL;
 
                             return ret - 2;

@@ -28,6 +28,7 @@
 #include <fstream>
 #include <sys/time.h>
 #include <iostream>
+#include <iomanip>
 #include <sstream>
 #include <list>
 
@@ -97,6 +98,8 @@
 
 #define IBRCOMMON_LOGGER_DEBUG_ex(verbosity) \
 	IBRCOMMON_LOGGER_DEBUG(verbosity) << __FILE__ << ":" << __LINE__ << " in " << __PRETTY_FUNCTION__ << ": "
+
+#define SS_HEX(i) "0x" << std::uppercase << std::setfill('0') << std::setw(2) << std::hex << (unsigned int) ((i) & 0xFF)
 
 namespace ibrcommon
 {

@@ -87,9 +87,9 @@ namespace dtn {
                 ::memcpy(&tmp[2], buf, length);
 
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                    << "send() type: " << std::hex << (int) type << "; flags: " << std::hex << flags
-                    << "; seqno: " << std::dec << seqno << "; length: " << std::dec << length
-                    << "; address: " << destination.toString() << IBRCOMMON_LOGGER_ENDL;
+                    << "send() "
+                    << packet_to_string(type, flags, seqno, buf, length, identifier)
+                    << IBRCOMMON_LOGGER_ENDL;
 
                 // create vaddress
                 ibrcommon::socketset sockset = _vsocket.getAll();
@@ -166,9 +166,9 @@ namespace dtn {
                             ::memcpy(buf, &tmp[2], ret - 2);
 
                             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                                << "recvfrom() type: " << std::hex << (int) type << "; flags: " << flags
-                                << "; seqno: " << std::dec << seqno << "; length: " << ret - 2
-                                << "; address: " << peeraddr.toString() << IBRCOMMON_LOGGER_ENDL;
+                                << "recvfrom() "
+                                << packet_to_string(type, flags, seqno, buf, ret - 2, peeraddr.toString())
+                                << IBRCOMMON_LOGGER_ENDL;
 
                             return ret - 2;
                         } catch (const std::bad_cast &) {}
