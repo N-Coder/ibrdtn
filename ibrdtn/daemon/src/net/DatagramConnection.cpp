@@ -35,7 +35,9 @@
 
 #define AVG_RTT_WEIGHT 0.875
 
-#define NEXT_SEQNO(s) ((s + 1) % _params.max_seq_numbers)
+#define INCR_SEQNO(s, p) ((s + p) % _params.max_seq_numbers)
+#define NEXT_SEQNO(s) (INCR_SEQNO(s, 1))
+#define SEQNO_RANGE_CHECK(val, from, to) ((from < to) ? (from <= val && val <= to) : (to >= val || val >= from))
 #define SEND_WINDOW_STRING "send window " << window_to_string(_send_window_frames, _params.send_window_size) \
     << ">" << _send_next_used_seqno
 #define RECV_WINDOW_STRING "receive window " << _recv_next_expected_seqno << "<" \
@@ -51,6 +53,7 @@ namespace dtn {
                 : _callback(callback), _identifier(identifier),
                   _stream(*this, params.max_msg_length), _sender(*this, _stream),
                   _send_next_used_seqno(0), _recv_next_expected_seqno(0),
+                  _send_is_before_first(true), _recv_header_seqno(0),
                   _params(params), _avg_rtt(static_cast<double>(params.initial_timeout)) {
         }
 
@@ -140,9 +143,9 @@ namespace dtn {
                 }
             }
             size_t width = window_width(frames);
-            ss << "}(" << frames.size() << "/" << width << "/" << max_width << ")";
-            //assert(frames.size() <= width && width <= max_width);
-            if (frames.size() > width || width > max_width) {
+            ss << "}(" << frames.size() << "/" << width << "/" << max_width << "/" << _params.max_seq_numbers << ")";
+            //assert(frames.size() <= width && width <= max_width && max_width <= _params.max_seq_numbers);
+            if (frames.size() > width || width > max_width || max_width > _params.max_seq_numbers) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
                     << "window width violation: " << ss.str() << IBRCOMMON_LOGGER_ENDL;
             }
@@ -180,8 +183,7 @@ namespace dtn {
 
         DatagramConnection::Stream::Stream(DatagramConnection &conn, const dtn::data::Length &maxmsglen)
                 : std::iostream(this), _buf_size(maxmsglen), _recv_queue_buf(_buf_size), _recv_queue_buf_len(0),
-                  _out_buf(_buf_size), _in_buf(_buf_size),
-                  _abort(false), _callback(conn) {
+                  _out_buf(_buf_size), _in_buf(_buf_size), _abort(false), _discard(false), _callback(conn) {
             // Initialize get pointer. This should be zero so that underflow is called upon first read.
             setg(0, 0, 0);
 
@@ -192,6 +194,21 @@ namespace dtn {
 
         DatagramConnection::Stream::~Stream() = default;
 
+        void DatagramConnection::Stream::discard_received_data() {
+            _discard = true;
+            _recv_queue_buf_cond.signal(true);
+        }
+
+        void
+        DatagramConnection::Stream::check_abort(bool check_discard) throw(DatagramException, InvalidDataException) {
+            if (_abort) {
+                throw DatagramException("stream aborted");
+            }
+            if (_discard && check_discard) {
+                _discard = false;
+                throw InvalidDataException("end of packet was discarded");
+            }
+        }
 
         void DatagramConnection::Stream::close() {
             ibrcommon::MutexLock l(_recv_queue_buf_cond);
@@ -228,10 +245,17 @@ namespace dtn {
 
                     _send_ack_cond.signal(true);
                     return;
+                } else if (received_seqno == f.seqno) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+                        << "received duplicate ACK " << received_seqno << " in " << SEND_WINDOW_STRING
+                        << ", resending requested frame"
+                        << IBRCOMMON_LOGGER_ENDL;
+                    f.retry++;
+                    _callback.callback_send(*this, f.flags, f.seqno, getIdentifier(), &f.buf[0], f.buf.size());
+                    return;
                 }
             }
 
-            // TODO handle double ACK by resending according frame?
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                 << "received ACK " << received_seqno << " which is not in " << SEND_WINDOW_STRING << ", discarding"
                 << IBRCOMMON_LOGGER_ENDL;
@@ -247,7 +271,28 @@ namespace dtn {
                 << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
-            // TODO what if stream on the other side was reset? => drop / flush window depending on first / last markers
+            if (flags.getBit(DatagramService::SEGMENT_FIRST)) {
+                if (!_recv_window_frames.empty()) {
+                    if (_recv_header_seqno == received_seqno) {
+                        // TODO is this a duplicated header or was the stream reset to the same position?
+                    } else {
+                        _stream.discard_received_data();
+                    }
+                } else {
+                    _recv_header_seqno = received_seqno;
+                }
+            }
+            if (flags.getBit(DatagramService::SEGMENT_LAST)) {
+                // reject last frame until receive window is empty
+                for (auto frame : _recv_window_frames) {
+                    if (frame.buf.empty()) {
+                        // instead of acking the received frame, we tell the sender for which frame we are still waiting
+                        frame.retry += 1;
+                        _callback.callback_ack(*this, frame.seqno, getIdentifier());
+                        return;
+                    }
+                }
+            }
 
             const std::list<window_frame>::iterator &frame = get_recv_window_frame(received_seqno);
             if (frame != _recv_window_frames.end()) {
@@ -273,6 +318,10 @@ namespace dtn {
         std::list<DatagramConnection::window_frame>::iterator
         DatagramConnection::get_recv_window_frame(const unsigned int &for_seqno) {
             size_t seqno = _recv_next_expected_seqno;
+            size_t max_seqno = INCR_SEQNO(seqno, (_params.recv_window_size - 1));
+            if (!SEQNO_RANGE_CHECK(for_seqno, seqno, max_seqno)) {
+                return _recv_window_frames.end();
+            }
             auto it = _recv_window_frames.begin();
             while (true) {
                 if (it == _recv_window_frames.end()) {
@@ -291,15 +340,14 @@ namespace dtn {
                     assert(it != _recv_window_frames.end());
                     return it;
                 }
-                if (window_width(_recv_window_frames) >= _params.recv_window_size) {
-                    return _recv_window_frames.end();
-                }
+                assert(window_width(_recv_window_frames) <= _params.recv_window_size);
                 seqno = NEXT_SEQNO(seqno);
                 it++;
             }
         }
 
         unsigned int DatagramConnection::flush_recv_window() {
+            // TODO timeouts / retries (counting) for received frames too?
             unsigned int flushed = 0;
             while (!_recv_window_frames.empty()) {
                 std::vector<char> &buf = _recv_window_frames.front().buf;
@@ -314,7 +362,6 @@ namespace dtn {
                     flushed++;
                     _stream.queue_received_data(&buf[0], buf.size());
                     _recv_next_expected_seqno = NEXT_SEQNO(_recv_next_expected_seqno);
-                    _callback.callback_ack(*this, _recv_next_expected_seqno, getIdentifier());
                     _recv_window_frames.pop_front();
                 } else {
                     break;
@@ -327,11 +374,11 @@ namespace dtn {
                 const char *buf, const dtn::data::Length &len) throw(DatagramException) {
             try {
                 ibrcommon::MutexLock l(_recv_queue_buf_cond);
-                if (_abort) throw DatagramException("stream aborted");
+                check_abort(false);
                 // wait until the buffer is free
                 while (_recv_queue_buf_len > 0) {
                     _recv_queue_buf_cond.wait();
-                    if (_abort) throw DatagramException("stream aborted");
+                    check_abort(false);
                 }
 
                 // copy the new data into the buffer, but leave out the first byte (header)
@@ -353,10 +400,10 @@ namespace dtn {
 
             try {
                 ibrcommon::MutexLock l(_recv_queue_buf_cond);
-                if (_abort) throw DatagramException("stream aborted");
+                check_abort(true);
                 while (_recv_queue_buf_len == 0) {
                     _recv_queue_buf_cond.wait();
-                    if (_abort) throw DatagramException("stream aborted");
+                    check_abort(true);
                 }
 
                 // copy the queue buffer to an internal buffer
@@ -511,7 +558,7 @@ namespace dtn {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
                 << "Stream::overflow()" << IBRCOMMON_LOGGER_ENDL;
 
-            if (_abort) throw DatagramException("stream aborted");
+            check_abort(false);
 
             char *ibegin = &_out_buf[0];
             char *iend = pptr();
@@ -551,9 +598,16 @@ namespace dtn {
         void DatagramConnection::send_serialized_stream_data(
                 const char *buf, const dtn::data::Length &len, bool last) throw(DatagramException) {
             DatagramService::FLAG_BITS flags = 0;
+            unsigned int seqno = _send_next_used_seqno;
+
+            if (_send_is_before_first) flags |= DatagramService::SEGMENT_FIRST;
+            if (last) flags |= DatagramService::SEGMENT_LAST;
+
+            _send_is_before_first = last;
+            _send_next_used_seqno = NEXT_SEQNO(_send_next_used_seqno);
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame to send, flags: " <<  flags << ", seqno: " << _send_next_used_seqno
+                << "frame to send, flags: " << flags << ", seqno: " << seqno
                 << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
             // lock the ACK variables and frame window
@@ -564,10 +618,9 @@ namespace dtn {
             _send_window_frames.emplace_back(); // constructs new window_frame() and appends it
             window_frame &new_frame = _send_window_frames.back();
             new_frame.flags = flags;
-            unsigned int seqno = new_frame.seqno = _send_next_used_seqno;
+            new_frame.seqno = seqno;
             new_frame.buf.assign(buf, buf + len);
             new_frame.retry = 0;
-            new_frame.tm.start();
 
             // send the datagram
             _callback.callback_send(*this, new_frame.flags, seqno, getIdentifier(), &new_frame.buf[0],
@@ -576,9 +629,6 @@ namespace dtn {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                 << "appended datagram with seqno " << seqno << " to " << SEND_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
-
-            // increment next sequence number
-            _send_next_used_seqno = NEXT_SEQNO(_send_next_used_seqno);
 
             // set timeout to twice the average round-trip-time
             size_t timeout = static_cast<size_t>(_avg_rtt * 2) + 1;
@@ -590,7 +640,7 @@ namespace dtn {
                 // or no more frames are to ACK if this was the last frame => all buffers flushed
                 while (window_width(_send_window_frames) >= _params.send_window_size
                        || (last && !_send_window_frames.empty())) {
-                    _send_ack_cond.wait(&ts);
+                    _send_ack_cond.wait(&ts); // TODO check per-frame timeout instead
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                     << "got ack and send window is no longer full, sender of seqno " << seqno

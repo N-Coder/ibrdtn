@@ -110,6 +110,8 @@ namespace dtn
 				 */
 				void queue_received_data(const char *buf, const dtn::data::Length &len) throw (DatagramException);
 
+				void discard_received_data();
+
 				/**
 				 * Close the stream to terminate all blocking
 				 * calls on it.
@@ -148,6 +150,10 @@ namespace dtn
 				// this variable is set to true to shutdown
 				// this stream
 				bool _abort;
+
+				bool _discard;
+
+				void check_abort(bool check_discard) throw(DatagramException, InvalidDataException);
 
 				// callback to the corresponding connection object
 				DatagramConnection &_callback;
@@ -192,8 +198,10 @@ namespace dtn
 			ibrcommon::Conditional _send_ack_cond;
 			unsigned int _send_next_used_seqno;
 			unsigned int _recv_next_expected_seqno;
+			bool _send_is_before_first;
+            unsigned int _recv_header_seqno;
 
-			const DatagramService::Parameter _params;
+            const DatagramService::Parameter _params;
 			dtn::data::EID _peer_eid;
             const std::string _identifier;
 
