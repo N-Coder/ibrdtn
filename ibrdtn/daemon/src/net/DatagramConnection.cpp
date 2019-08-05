@@ -206,6 +206,7 @@ namespace dtn {
             }
             if (_discard && check_discard) {
                 _discard = false;
+                _recv_queue_buf_len = 0;
                 throw InvalidDataException("end of packet was discarded");
             }
         }
@@ -266,27 +267,49 @@ namespace dtn {
         void DatagramConnection::data_received(
                 const DatagramService::FLAG_BITS &flags, const unsigned int &received_seqno, const char *buf,
                 const dtn::data::Length &len) {
+
+            bool first = flags.getBit(DatagramService::SEGMENT_FIRST);
+            bool last = flags.getBit(DatagramService::SEGMENT_LAST);
+
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame received, flags: " << flags << ", seqno: " << received_seqno
+                << "frame received, flags: " << SS_HEX(flags) << "("
+                << (first ? (last ? "full" : "first") : (last ? "last" : "middle"))
+                << "), seqno: " << std::dec << received_seqno
                 << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
-            if (flags.getBit(DatagramService::SEGMENT_FIRST)) {
+            if (first) {
                 if (!_recv_window_frames.empty()) {
                     if (_recv_header_seqno == received_seqno) {
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+                            << "first frame received in non-empty receive window, but this could be a duplicate..."
+                            << IBRCOMMON_LOGGER_ENDL;
                         // TODO is this a duplicated header or was the stream reset to the same position?
                     } else {
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+                            << "first frame received in non-empty receive window, discarding data and resetting receive seqno"
+                            << IBRCOMMON_LOGGER_ENDL;
                         _stream.discard_received_data();
+                        _recv_window_frames.clear();
+                        _recv_header_seqno = _recv_next_expected_seqno = received_seqno;
                     }
                 } else {
-                    _recv_header_seqno = received_seqno;
+                    if (_recv_next_expected_seqno != received_seqno) {
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+                            << "first frame received in empty receive window, resetting receive seqno"
+                            << IBRCOMMON_LOGGER_ENDL;
+                    }
+                    _recv_header_seqno = _recv_next_expected_seqno = received_seqno;
                 }
             }
-            if (flags.getBit(DatagramService::SEGMENT_LAST)) {
+            if (last) {
                 // reject last frame until receive window is empty
                 for (auto frame : _recv_window_frames) {
                     if (frame.buf.empty()) {
                         // instead of acking the received frame, we tell the sender for which frame we are still waiting
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                            << "last frame received with previous frames still missing, resend pending ACK "
+                            << frame.seqno << IBRCOMMON_LOGGER_ENDL;
                         frame.retry += 1;
                         _callback.callback_ack(*this, frame.seqno, getIdentifier());
                         return;
@@ -607,7 +630,7 @@ namespace dtn {
             _send_next_used_seqno = NEXT_SEQNO(_send_next_used_seqno);
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame to send, flags: " << flags << ", seqno: " << seqno
+                << "frame to send, flags: " << SS_HEX(flags) << ", seqno: " << seqno
                 << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
             // lock the ACK variables and frame window
@@ -652,7 +675,7 @@ namespace dtn {
                 if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                     handle_ack_timeout(last); // timeout - retransmit the whole window
                 } else {
-                    throw;
+                    throw;// TODO rethrow as DatagramException
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                     << "done handling timeouts after handling seqno " << seqno << ", new "
@@ -707,7 +730,7 @@ namespace dtn {
                     if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                         continue; // timeout again - repeat at while loop
                     } else {
-                        throw;
+                        throw; // TODO rethrow as DatagramException
                     }
                 }
             }
