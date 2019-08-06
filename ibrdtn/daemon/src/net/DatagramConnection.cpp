@@ -218,10 +218,8 @@ namespace dtn {
         }
 
         int DatagramConnection::Stream::sync() {
-            return std::char_traits<char>::eq_int_type(
-                    this->overflow(std::char_traits<char>::eof()),
-                    std::char_traits<char>::eof()
-            ) ? -1 : 0;
+            int eof = std::char_traits<char>::eof();
+            return std::char_traits<char>::eq_int_type(this->overflow(eof), eof) ? -1 : 0;
         }
 
         ////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -591,8 +589,8 @@ namespace dtn {
             setp(&_out_buf[0], &_out_buf[0] + _buf_size - 1);
 
             // copy the overflowing byte
-            bool not_eof = std::char_traits<char>::not_eof(c);
-            if (not_eof) {
+            bool is_eof = std::char_traits<char>::eq_int_type(c, std::char_traits<char>::eof());
+            if (!is_eof) {
                 *iend++ = std::char_traits<char>::to_char_type(c);
             }
 
@@ -602,7 +600,7 @@ namespace dtn {
             // if there is nothing to send, just return
             if (bytes != 0) {
                 try {
-                    _callback.send_serialized_stream_data(&_out_buf[0], bytes, !not_eof);
+                    _callback.send_serialized_stream_data(&_out_buf[0], bytes, is_eof);
                 } catch (const DatagramException &ex) {
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                         << "Stream::overflow() exception: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
@@ -615,7 +613,7 @@ namespace dtn {
                     << "Stream::overflow() nothing to send" << IBRCOMMON_LOGGER_ENDL;
             }
 
-            return not_eof;
+            return std::char_traits<char>::not_eof(c);
         }
 
         void DatagramConnection::send_serialized_stream_data(
