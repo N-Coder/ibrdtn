@@ -692,7 +692,9 @@ namespace dtn {
                 if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                     handle_ack_timeout(last); // timeout - retransmit the whole window
                 } else {
-                    throw;// TODO rethrow as DatagramException
+                    std::stringstream ss;
+                    ss << "ConditionalAbortException " << e.reason << ": " << e.what();
+                    throw DatagramException(ss.str());
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                     << "done handling timeouts after handling seqno " << seqno << ", new "
@@ -747,7 +749,9 @@ namespace dtn {
                     if (e.reason == ibrcommon::Conditional::ConditionalAbortException::COND_TIMEOUT) {
                         continue; // timeout again - repeat at while loop
                     } else {
-                        throw; // TODO rethrow as DatagramException
+                        std::stringstream ss;
+                        ss << "ConditionalAbortException " << e.reason << ": " << e.what();
+                        throw DatagramException(ss.str());
                     }
                 }
             }
