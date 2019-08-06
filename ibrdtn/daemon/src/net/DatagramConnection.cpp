@@ -77,8 +77,11 @@ namespace dtn {
         }
 
         void DatagramConnection::setup() throw() {
+            _send_next_used_seqno = INCR_SEQNO(dtn::utils::Random::gen_number(), 0);
+
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
-                << "setup(" << getIdentifier() << ")" << IBRCOMMON_LOGGER_ENDL;
+                << "setup(" << getIdentifier() << "), randomized first sender seqno is " << _send_next_used_seqno
+                << IBRCOMMON_LOGGER_ENDL;
 
             _callback.connectionUp(this);
             _sender.start();
@@ -282,10 +285,12 @@ namespace dtn {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                             << "first frame received in non-empty receive window, but this could be a duplicate..."
                             << IBRCOMMON_LOGGER_ENDL;
-                        // TODO is this a duplicated header or was the stream reset to the same position?
+                        // randomize starting seqno to prevent this problem
                     } else {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                            << "first frame received in non-empty receive window, discarding data and resetting receive seqno"
+                            << "first frame received in non-empty receive window, "
+                               "discarding data and resetting receive seqno from "
+                            << _recv_next_expected_seqno << " to " << received_seqno
                             << IBRCOMMON_LOGGER_ENDL;
                         _stream.discard_received_data();
                         _recv_window_frames.clear();
@@ -630,6 +635,9 @@ namespace dtn {
 
         void DatagramConnection::send_serialized_stream_data(
                 const char *buf, const dtn::data::Length &len, bool last) throw(DatagramException) {
+            // lock the ACK variables and frame window
+            ibrcommon::MutexLock l(_send_ack_cond);
+
             DatagramService::FLAG_BITS flags = 0;
             unsigned int seqno = _send_next_used_seqno;
 
@@ -644,9 +652,6 @@ namespace dtn {
 
             _send_is_before_first = last;
             _send_next_used_seqno = NEXT_SEQNO(_send_next_used_seqno);
-
-            // lock the ACK variables and frame window
-            ibrcommon::MutexLock l(_send_ack_cond);
 
             // add new frame to the window
             assert(window_width(_send_window_frames) < _params.send_window_size);
