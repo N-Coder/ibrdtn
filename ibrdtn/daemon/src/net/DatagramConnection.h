@@ -200,6 +200,7 @@ namespace dtn
 			unsigned int _recv_next_expected_seqno;
 			bool _send_is_before_first;
             unsigned int _recv_header_seqno;
+            bool _recv_is_after_last;
 
             const DatagramService::Parameter _params;
 			dtn::data::EID _peer_eid;

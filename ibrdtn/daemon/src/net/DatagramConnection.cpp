@@ -38,11 +38,12 @@
 #define MAKE_SEQNO(s) ((_params.max_seq_numbers + s) % _params.max_seq_numbers)
 #define NEXT_SEQNO(s) (MAKE_SEQNO(s + 1))
 #define SEQNO_RANGE_CHECK(val, from, to) ((from < to) ? (from <= val && val <= to) : (to >= val || val >= from))
-#define SEQNO_RANGE_WIDTH(from, to) (MAKE_SEQNO(to - from + 1))
+#define SEQNO_RANGE_WIDTH(from, to) (MAKE_SEQNO(to - from) + 1)
 #define SEND_WINDOW_STRING "send window " << window_to_string(_send_window_frames, _params.send_window_size) \
     << ">" << _send_next_used_seqno
 #define RECV_WINDOW_STRING "receive window " << _recv_next_expected_seqno << "<" \
     << window_to_string(_recv_window_frames, _params.recv_window_size)
+#define IF_A_ASSERT_B(A, B) {assert(!(A) || (B));}
 
 namespace dtn {
     namespace net {
@@ -53,8 +54,8 @@ namespace dtn {
                 DatagramConnectionCallback &callback)
                 : _callback(callback), _identifier(identifier),
                   _stream(*this, params.max_msg_length), _sender(*this, _stream),
-                  _send_next_used_seqno(0), _recv_next_expected_seqno(0),
-                  _send_is_before_first(true), _recv_header_seqno(0),
+                  _send_next_used_seqno(0), _recv_next_expected_seqno(0), _recv_header_seqno(0),
+                  _send_is_before_first(true), _recv_is_after_last(true),
                   _params(params), _avg_rtt(static_cast<double>(params.initial_timeout)) {
         }
 
@@ -275,70 +276,47 @@ namespace dtn {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                 << "frame received, flags: " << SS_HEX(flags) << " ("
                 << (first ? (last ? "full" : "first") : (last ? "last" : "middle"))
+                << (_recv_is_after_last ? ", after last" : "")
                 << "), seqno: " << std::dec << received_seqno
                 << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
             if (first) {
-                if (!_recv_window_frames.empty()) {
-                    if (_recv_header_seqno == received_seqno) {
+                unsigned int dist = SEQNO_RANGE_WIDTH(received_seqno, _recv_header_seqno);
+                if (dist <= _params.recv_window_size) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+                        << "first frame " << received_seqno << " lies in the window (width "
+                        << dist << ") of the previous first frame " << _recv_header_seqno
+                        << ", not resetting as this is probably a duplicate" << IBRCOMMON_LOGGER_ENDL;
+                    // using randomized starting seqno to prevent this problem
+                    // don't return yet as this might also be caused by a lost ACK
+                } else {
+                    if (!_recv_window_frames.empty() || !_recv_is_after_last) {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                            << "first frame received in non-empty receive window, but this could be a duplicate..."
-                            << IBRCOMMON_LOGGER_ENDL;
-                        // randomize starting seqno to prevent this problem
-                    } else {
-                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                            << "first frame received in non-empty receive window, "
+                            << "first frame received while other frames are pending, "
                                "discarding data and resetting receive seqno from "
                             << _recv_next_expected_seqno << " to " << received_seqno
                             << IBRCOMMON_LOGGER_ENDL;
                         _stream.discard_received_data();
                         _recv_window_frames.clear();
-                        _recv_header_seqno = _recv_next_expected_seqno = received_seqno;
-                    }
-                } else {
-                    if (_recv_next_expected_seqno != received_seqno) {
+                        _recv_is_after_last = true;
+                    } else if (_recv_next_expected_seqno != received_seqno) {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                             << "first frame received in empty receive window, resetting receive seqno from "
                             << _recv_next_expected_seqno << " to " << received_seqno
                             << IBRCOMMON_LOGGER_ENDL;
                     }
+
                     _recv_header_seqno = _recv_next_expected_seqno = received_seqno;
-                }
-            }
-            if (last) {
-                // reject last frame until receive window is empty
-                for (auto frame : _recv_window_frames) {
-                    if (frame.buf.empty()) {
-                        // instead of acking the received frame, we tell the sender for which frame we are still waiting
-                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                            << "last frame received with previous frames still missing, resend pending ACK "
-                            << frame.seqno << IBRCOMMON_LOGGER_ENDL;
-                        frame.retry += 1;
-                        _callback.callback_ack(*this, frame.seqno, getIdentifier());
-                        return;
-                    }
                 }
             }
 
             const std::list<window_frame>::iterator &frame = get_recv_window_frame(received_seqno);
-            if (frame != _recv_window_frames.end()) {
-                frame->buf.assign(buf, buf + len);
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "inserted received data, new " << RECV_WINDOW_STRING << ", flushing"
-                    << IBRCOMMON_LOGGER_ENDL;
-
-                unsigned int flushed = flush_recv_window();
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "flushed " << flushed << " frames of received data, new " << RECV_WINDOW_STRING
-                    << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
-
-                _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
-            } else {
+            if (frame == _recv_window_frames.end()) {
                 unsigned int max_seqno;
                 if (_recv_window_frames.empty()) {
                     max_seqno = MAKE_SEQNO(_recv_next_expected_seqno - 1);
-                }else{
+                } else {
                     max_seqno = _recv_window_frames.back().seqno;
                 }
                 unsigned int sender_width = SEQNO_RANGE_WIDTH(received_seqno, max_seqno);
@@ -356,7 +334,54 @@ namespace dtn {
                         << " > max_seq_numbers / 2 -> ignore frame"
                         << IBRCOMMON_LOGGER_ENDL;
                 }
+                return;
             }
+
+            if (!first && _recv_is_after_last) {
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
+                    << "got middle packet " << received_seqno << " while waiting for begin of new sequence, discarding"
+                    << IBRCOMMON_LOGGER_ENDL;
+                return;
+            } else {
+                assert(_recv_is_after_last == first);
+            }
+
+            // reject last frame until there are no pending frames in the receive window before the last one
+            if (last) {
+                for (auto it = _recv_window_frames.begin(); it != _recv_window_frames.end(); it++) {
+                    window_frame &pending_frame = *it;
+                    if (it == frame) {
+                        // send_serialized_stream_data wont send any frame past the last frame
+                        it++;
+                        assert(it == _recv_window_frames.end());
+                        break; // we found no empty frame up to this one, so we are good to continure
+                    } else if (pending_frame.buf.empty()) {
+                        // instead of acking the received frame, we tell the sender for which frame we are still waiting
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                            << "last frame received with previous frames still missing, resend pending ACK "
+                            << pending_frame.seqno << IBRCOMMON_LOGGER_ENDL;
+                        pending_frame.retry += 1;
+                        _callback.callback_ack(*this, pending_frame.seqno, getIdentifier());
+                        return;
+                    }
+                }
+            }
+
+            IF_A_ASSERT_B(first, _recv_window_frames.size() == 1);
+            frame->flags = flags;
+            frame->buf.assign(buf, buf + len);
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                << "inserted received data, new " << RECV_WINDOW_STRING << ", flushing"
+                << IBRCOMMON_LOGGER_ENDL;
+
+            unsigned int flushed = flush_recv_window();
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                << "flushed " << flushed << " frames of received data, new " << RECV_WINDOW_STRING
+                << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
+            IF_A_ASSERT_B(last, _recv_window_frames.empty() && _recv_is_after_last);
+            IF_A_ASSERT_B(first, _recv_window_frames.empty());
+
+            _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
         }
 
         std::list<DatagramConnection::window_frame>::iterator
@@ -394,18 +419,25 @@ namespace dtn {
             // TODO timeouts / retries (counting) for received frames too?
             unsigned int flushed = 0;
             while (!_recv_window_frames.empty()) {
-                std::vector<char> &buf = _recv_window_frames.front().buf;
-                //assert(_recv_window_frames.front().seqno == _recv_next_expected_seqno);
-                if (_recv_window_frames.front().seqno != _recv_next_expected_seqno) {
+                window_frame &frame = _recv_window_frames.front();
+                //assert(frame.seqno == _recv_next_expected_seqno);
+                if (frame.seqno != _recv_next_expected_seqno) {
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
                         << "flushing " << RECV_WINDOW_STRING
-                        << "; element at front claims to have seqno " << _recv_window_frames.front().seqno
+                        << "; element at front claims to have seqno " << frame.seqno
                         << IBRCOMMON_LOGGER_ENDL;
                 }
-                if (!buf.empty()) {
+                if (!frame.buf.empty()) {
                     flushed++;
-                    _stream.queue_received_data(&buf[0], buf.size());
+                    //IF_A_ASSERT_B(_recv_is_after_last, frame.flags.getBit(DatagramService::SEGMENT_FIRST));
+                    if (_recv_is_after_last && !frame.flags.getBit(DatagramService::SEGMENT_FIRST)) {
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
+                            << "got middle packet " << frame.seqno
+                            << " while waiting for begin of new sequence" << IBRCOMMON_LOGGER_ENDL;
+                    }
+                    _stream.queue_received_data(&frame.buf[0], frame.buf.size());
                     _recv_next_expected_seqno = NEXT_SEQNO(_recv_next_expected_seqno);
+                    _recv_is_after_last = frame.flags.getBit(DatagramService::SEGMENT_LAST);
                     _recv_window_frames.pop_front();
                 } else {
                     break;
