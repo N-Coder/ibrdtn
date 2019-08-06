@@ -35,10 +35,10 @@
 
 #define AVG_RTT_WEIGHT 0.875
 
-#define INCR_SEQNO(s, p) ((s + p) % _params.max_seq_numbers)
-#define NEXT_SEQNO(s) (INCR_SEQNO(s, 1))
+#define MAKE_SEQNO(s) ((_params.max_seq_numbers + s) % _params.max_seq_numbers)
+#define NEXT_SEQNO(s) (MAKE_SEQNO(s + 1))
 #define SEQNO_RANGE_CHECK(val, from, to) ((from < to) ? (from <= val && val <= to) : (to >= val || val >= from))
-#define SEQNO_RANGE_WIDTH(from, to) ((_params.max_seq_numbers + to - from + 1) % _params.max_seq_numbers)
+#define SEQNO_RANGE_WIDTH(from, to) (MAKE_SEQNO(to - from + 1))
 #define SEND_WINDOW_STRING "send window " << window_to_string(_send_window_frames, _params.send_window_size) \
     << ">" << _send_next_used_seqno
 #define RECV_WINDOW_STRING "receive window " << _recv_next_expected_seqno << "<" \
@@ -77,7 +77,7 @@ namespace dtn {
         }
 
         void DatagramConnection::setup() throw() {
-            _send_next_used_seqno = INCR_SEQNO(dtn::utils::Random::gen_number(), 0);
+            _send_next_used_seqno = MAKE_SEQNO(dtn::utils::Random::gen_number());
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
                 << "setup(" << getIdentifier() << "), randomized first sender seqno is " << _send_next_used_seqno
@@ -335,7 +335,13 @@ namespace dtn {
 
                 _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
             } else {
-                unsigned int sender_width = SEQNO_RANGE_WIDTH(received_seqno, _recv_window_frames.back().seqno);
+                unsigned int max_seqno;
+                if (_recv_window_frames.empty()) {
+                    max_seqno = MAKE_SEQNO(_recv_next_expected_seqno - 1);
+                }else{
+                    max_seqno = _recv_window_frames.back().seqno;
+                }
+                unsigned int sender_width = SEQNO_RANGE_WIDTH(received_seqno, max_seqno);
                 if (sender_width <= _params.max_seq_numbers / 2) {
                     IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                         << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
@@ -356,7 +362,7 @@ namespace dtn {
         std::list<DatagramConnection::window_frame>::iterator
         DatagramConnection::get_recv_window_frame(const unsigned int &for_seqno) {
             size_t seqno = _recv_next_expected_seqno;
-            size_t max_seqno = INCR_SEQNO(seqno, (_params.recv_window_size - 1));
+            size_t max_seqno = MAKE_SEQNO(seqno + _params.recv_window_size - 1);
             if (!SEQNO_RANGE_CHECK(for_seqno, seqno, max_seqno)) {
                 return _recv_window_frames.end();
             }
