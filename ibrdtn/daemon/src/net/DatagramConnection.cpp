@@ -270,7 +270,7 @@ namespace dtn {
             bool last = flags.getBit(DatagramService::SEGMENT_LAST);
 
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame received, flags: " << SS_HEX(flags) << "("
+                << "frame received, flags: " << SS_HEX(flags) << " ("
                 << (first ? (last ? "full" : "first") : (last ? "last" : "middle"))
                 << "), seqno: " << std::dec << received_seqno
                 << ", len: " << len << " via " << getIdentifier() << " in " << RECV_WINDOW_STRING
@@ -294,7 +294,8 @@ namespace dtn {
                 } else {
                     if (_recv_next_expected_seqno != received_seqno) {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                            << "first frame received in empty receive window, resetting receive seqno"
+                            << "first frame received in empty receive window, resetting receive seqno from "
+                            << _recv_next_expected_seqno << " to " << received_seqno
                             << IBRCOMMON_LOGGER_ENDL;
                     }
                     _recv_header_seqno = _recv_next_expected_seqno = received_seqno;
@@ -635,12 +636,14 @@ namespace dtn {
             if (_send_is_before_first) flags |= DatagramService::SEGMENT_FIRST;
             if (last) flags |= DatagramService::SEGMENT_LAST;
 
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+                << "frame to send, flags: " << SS_HEX(flags) << " ("
+                << (_send_is_before_first ? (last ? "full" : "first") : (last ? "last" : "middle"))
+                << "), seqno: " << std::dec << seqno << ", len: " << len << " via " << getIdentifier()
+                << IBRCOMMON_LOGGER_ENDL;
+
             _send_is_before_first = last;
             _send_next_used_seqno = NEXT_SEQNO(_send_next_used_seqno);
-
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                << "frame to send, flags: " << SS_HEX(flags) << ", seqno: " << seqno
-                << ", len: " << len << " via " << getIdentifier() << IBRCOMMON_LOGGER_ENDL;
 
             // lock the ACK variables and frame window
             ibrcommon::MutexLock l(_send_ack_cond);

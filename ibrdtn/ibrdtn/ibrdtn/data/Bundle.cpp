@@ -100,10 +100,11 @@ namespace dtn
         {
             std::stringstream ss;
             ss << PrimaryBlock::toString() << "{";
-            auto last = _blocks.rbegin();
-            for (const auto &_block : _blocks) {
-                ss << _block->toString();
-                if (&_block == &(*last)) {
+            auto last = _blocks.end();
+            last--;
+            for (auto it = _blocks.begin(); it != _blocks.end(); it++) {
+                ss << (*it)->toString();
+                if (it != last) {
                     ss << ", ";
                 }
             }

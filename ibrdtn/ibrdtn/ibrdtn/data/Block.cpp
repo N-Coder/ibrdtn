@@ -22,7 +22,7 @@
 #include "ibrdtn/data/Block.h"
 #include "ibrdtn/data/Bundle.h"
 #include <iostream>
-#include <iomanip>
+#include <ibrcommon/Logger.h>
 
 
 namespace dtn
@@ -56,11 +56,9 @@ namespace dtn
 		std::string Block::toString() const
         {
             std::stringstream ss;
-            std::ios_base::fmtflags fmtflags = ss.flags();
-            ss << "[Block type " << std::hex << std::uppercase << std::setfill('0') << std::setw(2) << getType();
-            ss << ", flags 0x" << getProcessingFlags();
-            ss.flags(fmtflags);
-            ss << ", length " << getLength();
+            ss << "[Block type " << SS_HEX(getType());
+            ss << ", flags " << SS_HEX(getProcessingFlags());
+            ss << ", length " << std::dec << getLength();
             ss << ", " << getEIDList().size() << " eids";
             ss << "]";
             return ss.str();
