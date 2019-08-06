@@ -38,6 +38,7 @@
 #define INCR_SEQNO(s, p) ((s + p) % _params.max_seq_numbers)
 #define NEXT_SEQNO(s) (INCR_SEQNO(s, 1))
 #define SEQNO_RANGE_CHECK(val, from, to) ((from < to) ? (from <= val && val <= to) : (to >= val || val >= from))
+#define SEQNO_RANGE_WIDTH(from, to) ((_params.max_seq_numbers + to - from + 1) % _params.max_seq_numbers)
 #define SEND_WINDOW_STRING "send window " << window_to_string(_send_window_frames, _params.send_window_size) \
     << ">" << _send_next_used_seqno
 #define RECV_WINDOW_STRING "receive window " << _recv_next_expected_seqno << "<" \
@@ -156,8 +157,7 @@ namespace dtn {
             if (frames.empty()) {
                 return 0;
             } else {
-                size_t width = _params.max_seq_numbers + frames.back().seqno - frames.front().seqno;
-                return (width + 1) % _params.max_seq_numbers;
+                return SEQNO_RANGE_WIDTH(frames.front().seqno, frames.back().seqno);
             }
         }
 
@@ -329,10 +329,21 @@ namespace dtn {
 
                 _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
             } else {
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
-                    << IBRCOMMON_LOGGER_ENDL;
-                // TODO handle lost ACK / too big sender window properly
+                unsigned int sender_width = SEQNO_RANGE_WIDTH(received_seqno, _recv_window_frames.back().seqno);
+                if (sender_width <= _params.max_seq_numbers / 2) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                        << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
+                        << ", width between received and biggest seqno is " << sender_width
+                        << " <= max_seq_numbers / 2 -> resending lost selective ACK"
+                        << IBRCOMMON_LOGGER_ENDL;
+                    _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
+                } else {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                        << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
+                        << ", width between received and biggest seqno is " << sender_width
+                        << " > max_seq_numbers / 2 -> ignore frame"
+                        << IBRCOMMON_LOGGER_ENDL;
+                }
             }
         }
 
