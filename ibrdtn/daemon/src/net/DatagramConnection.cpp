@@ -457,7 +457,7 @@ namespace dtn {
                     check_abort(false);
                 }
 
-                // copy the new data into the buffer, but leave out the first byte (header)
+                // copy the new data into the buffer
                 ::memcpy(&_recv_queue_buf[0], buf, len);
 
                 // store the buffer length
@@ -718,7 +718,10 @@ namespace dtn {
                 // or no more frames are to ACK if this was the last frame => all buffers flushed
                 while (window_width(_send_window_frames) >= _params.send_window_size
                        || (last && !_send_window_frames.empty())) {
-                    _send_ack_cond.wait(&ts); // TODO check per-frame timeout instead
+                    _send_ack_cond.wait(&ts);
+                    // TODO check per-frame timeout instead and resend selectively
+                    // TODO add some minimum delay between sent packets?
+                    // FIXME window width violation on appended datagram with seqno 58 to send window {[ #50, len 1278 | retry 0, t 0ms], [ #58, len 1278 | retry 0, t 0ms]}(2/9/8/255)>59
                 }
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                     << "got ack and send window is no longer full, sender of seqno " << seqno
@@ -767,6 +770,7 @@ namespace dtn {
                         _callback.callback_send(*this, retry_frame.flags, retry_frame.seqno, getIdentifier(),
                                                 &retry_frame.buf[0], retry_frame.buf.size());
                         retry_frame.retry++;
+                        Thread::sleep(200);
                     }
                 }
 

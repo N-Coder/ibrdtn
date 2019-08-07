@@ -28,6 +28,8 @@ namespace dtn {
             return dtn::net::DiscoveryService::asTag(getProtocol());
         }
 
+        // TODO add CRC checksum
+
         void DatagramService::read_header_short(const char *buf, DatagramService::FRAME_TYPE &type,
                                                 DatagramService::FLAG_BITS &flags, unsigned int &seqno) {
             // SSSS FF TT
