@@ -1,48 +1,30 @@
 apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+apply plugin: 'kotlin-android-extensions'
 
-def ndkDir = null;
-Properties properties = new Properties()
-try {
-    properties.load(project.rootProject.file('local.properties').newDataInputStream())
-    ndkDir = properties.getProperty('ndk.dir')
-} catch (IOException e) {}
+ext {
+    JNI_SRC_DIR = "src/main/jni"
+}
 
-
-
-def createVersionName() {
-    if (System.getenv().containsKey("BUILD_NUMBER")) {
-        if (System.getenv().containsKey("GIT_COMMIT")) {
-            return rootProject.ext.versionName + "-" + System.getenv("GIT_COMMIT").substring(0, 7)
-        } else {
-            return rootProject.ext.versionName + "-" + System.getenv("BUILD_NUMBER")
-        }
-    } else {
-        return rootProject.ext.versionName
+def getNDKDir() {
+    try {
+        Properties properties = new Properties()
+        properties.load(rootProject.file('local.properties').newDataInputStream())
+        properties.getProperty('ndk.dir')
+    } catch (IOException ignored) {
+        ""
     }
 }
 
-android {
-    compileSdkVersion rootProject.ext.compileSdkVersion
+rootProject.defaultAndroidConfig(project)
 
+android {
     defaultConfig {
-        applicationId "de.tubs.ibr.dtn"
-        minSdkVersion 24
-        targetSdkVersion 29
-        versionCode System.getenv("BUILD_NUMBER") as Integer ?: rootProject.ext.versionCode
-        versionName createVersionName()
+        applicationId "${project.group}.app"
     }
-    signingConfigs {
-        release {
-            storeFile file(System.getenv("KEYSTORE") ?: "publish.keystore")
-            storePassword System.getenv("KEYSTORE_PASSWD")
-            keyAlias System.getenv("KEY_ALIAS") ?: android.defaultConfig.applicationId
-            keyPassword System.getenv("KEY_PASSWD")
-        }
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+    externalNativeBuild {
+        ndkBuild {
+            path file("${JNI_SRC_DIR}/Android.mk")
         }
     }
     sourceSets.main {
@@ -51,36 +33,33 @@ android {
     }
 }
 
-// enable signing if the keystore exists
 if (android.signingConfigs.release.storeFile.exists()) {
     android.buildTypes.release.signingConfig = android.signingConfigs.release
 }
 
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/dtnd/Android.mk
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/ibrcommon/Android.mk
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/ibrdtn/Android.mk
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/android-glue/SWIGWrapper.*
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/libs/*
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/obj/*
-///home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/build
-
-// TODO make sure that yacc is actually bison and not byacc (/home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/nl-3/android_toolchain/jni/Android.mk)
-
-task ndkBuild(type: Exec) {
+task prepareNDKBuild(type: Exec) {
     executable "sh"
-    workingDir "src/main/jni"
+    workingDir JNI_SRC_DIR
+    def ndkDir = getNDKDir()
     if (ndkDir != null) {
-        args "-c", "export PATH=${ndkDir}:\$PATH; ./build.sh"
+        args "-c", "export PATH=${ndkDir}:\$PATH; ./prepareBuild.sh"
     } else {
-        args "build.sh"
+        args "prepareBuild.sh"
     }
 }
-preBuild.dependsOn ndkBuild
+preBuild.dependsOn prepareNDKBuild
+
+task cleanNDKBuild(type: Exec) {
+    executable "sh"
+    workingDir JNI_SRC_DIR
+    args "cleanBuild.sh"
+}
+clean.finalizedBy cleanNDKBuild
 
 dependencies {
-    api 'de.tubs.ibr.dtn:library:1.1.2'
-    implementation 'com.android.support:support-v4:23.1.1'
-    implementation 'com.jjoe64:graphview:3.1.+'
-    implementation 'com.google.zxing:core:3.2.+'
-    implementation 'com.google.zxing:android-integration:3.2.+'
+    api project(':library') // "de.tubs.ibr.dtn:library:${project.version}"
+    implementation "com.jjoe64:graphview:3.1.4"
+    implementation "com.google.zxing:core:3.2.1"
+    implementation "com.google.zxing:android-integration:3.2.1"
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }

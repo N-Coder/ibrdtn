@@ -21,10 +21,14 @@ if [ ! -e "$(which androgenizer)" ]; then
     cd androgenizer
     make
     cd ..
+  else
+    echo "Already cloned"
   fi
 
   # Add androgenizer to path
   export PATH=${PATH}:$(pwd)/androgenizer
+else
+  echo "Already available in PATH"
 fi
 
 echo ""
@@ -43,6 +47,8 @@ if [ ! -d nl-3 ]; then
   cd nl-3
   git checkout --detach ${LIBNL_COMMIT}
   cd ..
+else
+  echo "Already cloned"
 fi
 
 # check if the existing directory has the right revision
@@ -58,10 +64,13 @@ if [ ! -d openssl ]; then
   git checkout --detach ${OPENSSL_COMMIT}
   git am < ../0001-renamed-crypto-library.patch
   cd ..
+else
+  echo "Already cloned"
 fi
 
 # if this variable is set to 1 all following parts are rebuilt
 REBUILD=0
+# TODO make sure that yacc is actually bison and not byacc (/home/niko/Sync/Projects/MA-impl/IBR-DTN/android/app/src/main/jni/nl-3/android_toolchain/jni/Android.mk)
 
 echo ""
 echo "Generating Android.mk files using Autotools and Androgenizer..."
@@ -78,6 +87,8 @@ do
 		make clean
 		make
 		REBUILD=1
+    else
+      echo "Already generated"
 	fi
 	cd ..
 done
@@ -89,15 +100,6 @@ if [ ! -e "../java/de/tubs/ibr/dtn/swig" ] || [ ${REBUILD} -eq 1 ]; then
 	rm -Rf ../java/de/tubs/ibr/dtn/swig
 	mkdir -p ../java/de/tubs/ibr/dtn/swig
 	swig -c++ -java -package de.tubs.ibr.dtn.swig -verbose -outdir ../java/de/tubs/ibr/dtn/swig/ -o android-glue/SWIGWrapper.cpp android-glue/swig.i
-fi
-
-echo ""
-echo "Building IBR-DTN with Android NDK..."
-echo "------------------------------------"
-if [ -e "$(which ndk-build)" ]; then
-  ndk-build -j4
 else
-  echo "ndk-build from android-ndk not in PATH"
-  exit 1
+  echo "Already generated"
 fi
-

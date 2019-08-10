@@ -14,6 +14,7 @@ APP_ABI:=all
 
 # API 9 has RW Mutex implementation in pthread lib
 APP_PLATFORM:=android-24
+# see /build.gradle#defaultAndroidConfig.project.android.defaultConfig.minSdkVersion
 
 # See for documentation on Androids c++ support: $(NDK_PATH)/docs/CPLUSPLUS-SUPPORT.html
 # select c++ gnu stl, because we need exception support
