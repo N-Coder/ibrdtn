@@ -76,15 +76,6 @@ public class DaemonProcess {
 	{
 		try
 		{
-			System.loadLibrary("c++_shared");
-
-//			System.loadLibrary("cryptox");
-//			System.loadLibrary("ssl");
-
-//			System.loadLibrary("ibrcommon");
-//			System.loadLibrary("ibrdtn");
-			System.loadLibrary("dtnd");
-
 			System.loadLibrary("android-glue");
 		} catch (UnsatisfiedLinkError e)
 		{

@@ -47,5 +47,6 @@ Android.mk: Makefile.am
 			$(subst lib,libibrdtn_, $(ibrdtn_libs)) \
 			-lz \
 		-:LIBFILTER_WHOLE ibrdtn_api ibrdtn_data ibrdtn_streams ibrdtn_utils ibrdtn_security \
+		-:LIBFILTER_STATIC ibrcommon \
 		-:SUBDIR $(patsubst %,ibrdtn/%, $(SUBDIRS)) \
 		> $@

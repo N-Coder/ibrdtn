@@ -70,14 +70,15 @@ endif
 Android.mk: Makefile.am
 	$(ANDROGENIZER) -:PROJECT dtnd \
 		-:REL_TOP $(top_srcdir) -:ABS_TOP $(abs_top_srcdir) \
-		-:SHARED dtnd \
+		-:STATIC dtnd \
 		-:SOURCES $(dtnd_sources) \
 		-:CPPFLAGS $(CPPFLAGS) $(AM_CPPFLAGS) \
 		-:LDFLAGS $(AM_LDFLAGS) \
 			$(subst lib,libdtnd_, $(dtnd_libs)) \
 			-lz \
 			-llog \
-		-:LIBFILTER_WHOLE dtnd_core dtnd_storage dtnd_net dtnd_routing dtnd_api ibrcommon ibrdtn \
+		-:LIBFILTER_WHOLE dtnd_core dtnd_storage dtnd_net dtnd_routing dtnd_api \
+		-:LIBFILTER_STATIC ibrcommon ibrdtn \
 		-:SUBDIR $(patsubst %,src/%, $(SUBDIRS)) \
 		> $@
 
