@@ -110,21 +110,21 @@
 						android:id="@+id/imageViewTrustLevelOldKey1"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 					<ImageView 
 						android:id="@+id/imageViewTrustLevelOldKey2"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 					<ImageView 
 						android:id="@+id/imageViewTrustLevelOldKey3"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 				</LinearLayout>
@@ -181,21 +181,21 @@
 						android:id="@+id/imageViewTrustLevelNewKey1"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 					<ImageView 
 						android:id="@+id/imageViewTrustLevelNewKey2"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 					<ImageView 
 						android:id="@+id/imageViewTrustLevelNewKey3"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:src="@drawable/ic_action_security_open"
+						android:src="@drawable/ic_security_open"
 						android:contentDescription="@string/trust_level_image"/>
 					
 				</LinearLayout>

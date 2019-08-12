@@ -61,7 +61,7 @@ public class KeyExchangeService extends IntentService {
 		NotificationCompat.Builder builder = new NotificationCompat.Builder(this);
 
 		// set default small icon
-		builder.setSmallIcon(R.drawable.ic_stat_security);
+		builder.setSmallIcon(R.drawable.ic_security_closed);
 		
 		// set identicon as large icon
 		Bitmap identicon = Utils.createIdenticon(endpoint.toString());

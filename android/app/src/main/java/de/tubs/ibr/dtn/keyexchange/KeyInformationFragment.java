@@ -475,7 +475,7 @@ public class KeyInformationFragment extends Fragment {
 				trustLevelImage1.setImageDrawable(d);
 				trustLevelImage2.setImageDrawable(d);
 				
-				d = getResources().getDrawable(R.drawable.ic_action_security_open);
+				d = getResources().getDrawable(R.drawable.ic_security_open);
 				trustLevelImage3.setImageDrawable(d);
 			}
 			else if (trust_level > 0) {
@@ -483,12 +483,12 @@ public class KeyInformationFragment extends Fragment {
 				d.setColorFilter(getResources().getColor(R.color.trust_low), Mode.SRC_IN);
 				trustLevelImage1.setImageDrawable(d);
 				
-				d = getResources().getDrawable(R.drawable.ic_action_security_open);
+				d = getResources().getDrawable(R.drawable.ic_security_open);
 				trustLevelImage2.setImageDrawable(d);
 				trustLevelImage3.setImageDrawable(d);
 			}
 			else {
-				Drawable d = getResources().getDrawable(R.drawable.ic_action_security_open);
+				Drawable d = getResources().getDrawable(R.drawable.ic_security_open);
 				trustLevelImage1.setImageDrawable(d);
 				trustLevelImage2.setImageDrawable(d);
 				trustLevelImage3.setImageDrawable(d);

@@ -51,14 +51,14 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:theme="@style/AppTheme"
         tools:ignore="GoogleAppIndexingWarning">
 
         <activity
             android:name=".daemon.Preferences"
-            android:icon="@drawable/ic_launcher"
+            android:icon="@mipmap/ic_launcher"
             android:label="@string/app_name"
             android:uiOptions="splitActionBarWhenNarrow">
             <intent-filter>
@@ -122,7 +122,7 @@
 
         <activity
             android:name=".daemon.StatsActivity"
-            android:icon="@drawable/ic_action_stats"
+            android:icon="@drawable/ic_stats"
             android:label="@string/stats_activity"
             android:parentActivityName=".daemon.Preferences">
             <meta-data

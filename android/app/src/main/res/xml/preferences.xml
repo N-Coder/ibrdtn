@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android" >
 
-    <PreferenceCategory android:title="@string/service" >
-        <CheckBoxPreference
-            android:key="enabledSwitch"
-            android:title="@string/launch_daemon"
-            android:defaultValue="true" />
-    </PreferenceCategory>
     <PreferenceCategory
         android:key="prefcat_general"
         android:title="@string/general" >
@@ -18,7 +12,7 @@
             android:summary="@string/eid_description"
             android:title="@string/endpoint_id">
         </de.tubs.ibr.dtn.daemon.EndpointListPreference>
-        
+
         <ListPreference
             android:defaultValue="prophet"
             android:entries="@array/routing_scheme_names"
@@ -55,6 +49,15 @@
             android:summary="@string/pref_uplink_summary"
             android:title="@string/pref_uplink_title" >
         </ListPreference>
+        <SwitchPreference
+            android:defaultValue="false"
+            android:disableDependentsState="false"
+            android:key="p2p_enabled"
+            android:summary="@string/pref_p2p_summary"
+            android:switchTextOff="@string/pref_p2p_off"
+            android:switchTextOn="@string/pref_p2p_on"
+            android:title="@string/pref_p2p"
+            android:enabled="false" />
     </PreferenceCategory>
     <de.tubs.ibr.dtn.daemon.InterfacePreferenceCategory
         android:key="prefcat_interfaces"

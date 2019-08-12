@@ -46,21 +46,21 @@
 				android:id="@+id/viewTrustMarker1"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:src="@drawable/ic_action_security_open"
+				android:src="@drawable/ic_security_open"
 				android:contentDescription="@string/trust_level_image"/>
 			
 			<ImageView 
 				android:id="@+id/viewTrustMarker2"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:src="@drawable/ic_action_security_open"
+				android:src="@drawable/ic_security_open"
 				android:contentDescription="@string/trust_level_image"/>
 			
 			<ImageView 
 				android:id="@+id/viewTrustMarker3"
 				android:layout_width="wrap_content"
 				android:layout_height="wrap_content"
-				android:src="@drawable/ic_action_security_open"
+				android:src="@drawable/ic_security_open"
 				android:contentDescription="@string/trust_level_image"/>
 		</LinearLayout>
 		

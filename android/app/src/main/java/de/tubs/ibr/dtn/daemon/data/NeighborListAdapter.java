@@ -75,7 +75,7 @@ public class NeighborListAdapter extends BaseAdapter {
         holder.node = mList.get(position);
         
         int image_color = R.color.node_default;
-
+        // TODO the following icons are only used here, so give them approriate names
         if (holder.node.type.equals("NODE_P2P")) {
             holder.imageIcon.setImageResource(R.drawable.ic_p2p);
             image_color = R.color.node_p2p;
