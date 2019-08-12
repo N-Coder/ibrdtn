@@ -1,6 +1,6 @@
 /*
  * DaemonService.java
- * 
+ *
  * Copyright (C) 2013 IBR, TU Braunschweig
  *
  * Written-by: Dominik Schürmann <dominik@dominikschuermann.de>
@@ -23,12 +23,10 @@
 
 package de.tubs.ibr.dtn.service;
 
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Date;
-import java.util.List;
-
 import android.annotation.TargetApi;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -52,8 +50,15 @@ import android.os.Parcelable;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.preference.PreferenceManager;
+import android.support.v4.app.NotificationCompat;
 import android.util.Log;
 import android.widget.Toast;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+
 import de.tubs.ibr.dtn.DTNService;
 import de.tubs.ibr.dtn.DaemonState;
 import de.tubs.ibr.dtn.R;
@@ -84,7 +89,7 @@ public class DaemonService extends Service {
 	public static final String ACTION_PREFERENCE_CHANGED = "de.tubs.ibr.dtn.action.PREFERENCE_CHANGED";
 
 	public static final String ACTION_NETWORK_CHANGED = "de.tubs.ibr.dtn.action.NETWORK_CHANGED";
-	
+
 	public static final String ACTION_CONNECTIVITY_CHANGED = "de.tubs.ibr.dtn.action.CONNECTIVITY_CHANGED";
 	public static final String EXTRA_CONNECTIVITY_STATE = "de.tubs.ibr.dtn.action.CONNECTIVITY_STATE";
 
@@ -97,26 +102,30 @@ public class DaemonService extends Service {
 	public static final String ACTION_START_DISCOVERY = "de.tubs.ibr.dtn.action.START_DISCOVERY";
 	public static final String ACTION_STOP_DISCOVERY = "de.tubs.ibr.dtn.action.STOP_DISCOVERY";
 	public static final String EXTRA_DISCOVERY_DURATION = "de.tubs.ibr.dtn.intent.DISCOVERY_DURATION";
-	
+
 	public static final String ACTION_START_KEY_EXCHANGE = "de.tubs.ibr.dtn.action.START_KEY_EXCHANGE";
 	public static final String ACTION_GIVE_PASSWORD_RESPONSE = "de.tubs.ibr.dtn.action.GIVE_PASSWORD_RESPONSE";
 	public static final String ACTION_GIVE_HASH_RESPONSE = "de.tubs.ibr.dtn.action.GIVE_HASH_RESPONSE";
 	public static final String ACTION_GIVE_NEW_KEY_RESPONSE = "de.tubs.ibr.dtn.action.GIVE_NEW_KEY_RESPONSE";
 	public static final String ACTION_GIVE_QR_RESPONSE = "de.tubs.ibr.dtn.action.GIVE_QR_RESPONSE";
 	public static final String ACTION_GIVE_NFC_RESPONSE = "de.tubs.ibr.dtn.action.GIVE_NFC_RESPONSE";
-	
+
 	public static final String ACTION_LOGGING_CHANGED = "de.tubs.ibr.dtn.action.LOGGING_CHANGED";
 	public static final String ACTION_CONFIGURATION_CHANGED = "de.tubs.ibr.dtn.action.CONFIGURATION_CHANGED";
 
 	public static final String PREFERENCE_NAME = "de.tubs.ibr.dtn.service_prefs";
-	
+
 	public static final String ACTION_REMOVE_KEY = "de.tubs.ibr.dtn.action.ACTION_REMOVE_KEY";
+
+	public static final  int NOTIFICATION_ONGOING_FOREGROUND_ID = 1;
+	public static final  String NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID = "de.tubs.ibr.dtn.service.DaemonService.ForegroundNotificationChannel";
+
 
 	private final String TAG = "DaemonService";
 
 	private HandlerThread mServiceThread;
 	private ServiceHandler mServiceHandler;
-	
+
 	private int MSG_WHAT_STOP_DISCOVERY = 1;
 	private int MSG_WHAT_COLLECT_STATS = 2;
 
@@ -131,10 +140,10 @@ public class DaemonService extends Service {
 
 	// time-stamp of the last stats action
 	private Date mStatsLastAction = null;
-	
+
 	// global discovery state
 	private Boolean mDiscoveryState = false;
-	
+
 	// Last inspected Wi-Fi SSID
 	private String mDiscoverySsid = null;
 
@@ -185,7 +194,7 @@ public class DaemonService extends Service {
 			return ret;
 		}
 	};
-	
+
 	private final ControlService.Stub mControlBinder = new ControlService.Stub() {
 		@Override
 		public boolean isP2pSupported() throws RemoteException {
@@ -202,7 +211,7 @@ public class DaemonService extends Service {
 			return DaemonService.this.getStats();
 		}
 	};
-	
+
 	private final KeyExchangeManager.Stub mKeyExchangeBinder = new KeyExchangeManager.Stub() {
 		@Override
 		public SingletonEndpoint getEndpoint() throws RemoteException {
@@ -225,33 +234,33 @@ public class DaemonService extends Service {
 		@Override
 		public Bundle execute(Intent intent) throws RemoteException {
 			Bundle ret = new Bundle();
-			
+
 			if (SecurityUtils.ACTION_INFO_ACTIVITY.equals(intent.getAction())) {
 				Intent infoIntent = new Intent(DaemonService.this, KeyInformationActivity.class);
-				
+
 				// extract endpoint from extras
 				String endpoint = intent.getStringExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 				de.tubs.ibr.dtn.swig.EID node = null;
-				
+
 				// set default node, if not set
 				if (endpoint == null) {
 					// create local singleton endpoint
 					SharedPreferences prefs = getSharedPreferences("dtnd", Context.MODE_PRIVATE);
 					node = new de.tubs.ibr.dtn.swig.EID(Preferences.getEndpoint(DaemonService.this, prefs));
-					
+
 					// mark the endpoint as local
 					infoIntent.putExtra(KeyInformationActivity.EXTRA_IS_LOCAL, true);
 				} else {
 					// create singleton endpoint
 					node = new de.tubs.ibr.dtn.swig.EID(endpoint);
 				}
-				
+
 				// create new endpoint object using the return value from key-data
 				SingletonEndpoint host = new SingletonEndpoint(node.getNode().getString());
-				
+
 				// put endpoint into extras of info intent
 				infoIntent.putExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT, (Parcelable)host);
-				
+
 				PendingIntent pi = PendingIntent.getActivity(DaemonService.this, 0, infoIntent, PendingIntent.FLAG_ONE_SHOT | PendingIntent.FLAG_UPDATE_CURRENT);
 				ret.putParcelable(de.tubs.ibr.dtn.Intent.EXTRA_PENDING_INTENT, pi);
 			}
@@ -259,7 +268,7 @@ public class DaemonService extends Service {
 				// extract endpoint from extras
 				String endpoint = intent.getStringExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 				SingletonEndpoint node = null;
-				
+
 				// set default node, if not set
 				if (endpoint == null) {
 					// create local singleton endpoint
@@ -269,11 +278,11 @@ public class DaemonService extends Service {
 					// create singleton endpoint
 					node = new SingletonEndpoint(endpoint);
 				}
-				
+
 				// get key data
 				Bundle keydata = mDaemonProcess.getKeyInfo(node);
-				
-				// put all data into the bundle				
+
+				// put all data into the bundle
 				if (keydata != null) {
 					ret.putAll(keydata);
 				}
@@ -287,7 +296,7 @@ public class DaemonService extends Service {
 	public IBinder onBind(Intent intent) {
 		// the requested service name
 		String name = intent.getStringExtra(Services.EXTRA_NAME);
-		
+
 		if (KeyExchangeManager.class.getName().equals(name)) {
 			return mKeyExchangeBinder;
 		} else if (ControlService.class.getName().equals(name)) {
@@ -300,7 +309,7 @@ public class DaemonService extends Service {
 			return null;
 		}
 	}
-	
+
 	public static Intent createDtnServiceIntent(Context context) {
 		Intent i = new Intent(context, DaemonService.class);
 
@@ -327,7 +336,7 @@ public class DaemonService extends Service {
 
 		return i;
 	}
-	
+
 	public static Intent createControlServiceIntent(Context context) {
 		Intent i = new Intent(context, DaemonService.class);
 
@@ -342,7 +351,7 @@ public class DaemonService extends Service {
 
 	private final static class ServiceHandler extends Handler {
 		private DaemonService mService = null;
-		
+
 		public ServiceHandler(Looper looper, DaemonService service) {
 			super(looper);
 			mService = service;
@@ -357,7 +366,7 @@ public class DaemonService extends Service {
 
 	/**
 	 * Incoming Intents are handled here
-	 * 
+	 *
 	 * @param intent
 	 */
 	protected void onHandleIntent(Intent intent, int startId) {
@@ -368,8 +377,7 @@ public class DaemonService extends Service {
 
 			// only start if the daemon is offline or in error state
 			// and if the daemon switch is on
-			if ((mDaemonProcess.getState().equals(DaemonState.OFFLINE) || mDaemonProcess.getState()
-					.equals(DaemonState.ERROR))
+			if (mDaemonProcess.getState().equals(DaemonState.OFFLINE)
 					&& prefs.getBoolean(Preferences.KEY_ENABLED, true)) {
 				// start-up the daemon
 				mDaemonProcess.start();
@@ -385,10 +393,10 @@ public class DaemonService extends Service {
 		} else if (ACTION_PREFERENCE_CHANGED.equals(action)) {
 			// get preference key to determine the restart level
 			String prefkey = intent.getStringExtra("prefkey");
-			
+
 			// store preference values locally
 			SharedPreferences prefs = getSharedPreferences("dtnd", Context.MODE_PRIVATE);
-			
+
 			if (intent.hasExtra(Preferences.KEY_ENABLED)) {
 				boolean value = intent.getBooleanExtra(Preferences.KEY_ENABLED, false);
 				prefs.edit().putBoolean(Preferences.KEY_ENABLED, value).commit();
@@ -490,13 +498,13 @@ public class DaemonService extends Service {
 		} else if (ACTION_CONNECTIVITY_CHANGED.equals(action)) {
 			// check connectivity and restart daemon if necessary
 			boolean newState = false;
-			
+
 			String state = intent.getStringExtra(EXTRA_CONNECTIVITY_STATE);
-			
+
 			// get preferences
 			SharedPreferences prefs = getSharedPreferences("dtnd", Context.MODE_PRIVATE);
 			String cloud_mode = prefs.getString(Preferences.KEY_UPLINK_MODE, "wifi");
-			
+
 			if ("offline".equals(state)) {
 				newState = false;
 			}
@@ -509,7 +517,7 @@ public class DaemonService extends Service {
 			else if ("online".equals(state)) {
 				newState = "on".equals(cloud_mode);
 			}
-			
+
 			// restart the daemon into the given run-level
 			mDaemonProcess.setGloballyConnected(newState, new DaemonProcess.OnRestartListener() {
 				@Override
@@ -534,11 +542,11 @@ public class DaemonService extends Service {
 				public void OnReloadConfiguration() {
 				}
 			});
-			
+
 		} else if (ACTION_STORE_STATS.equals(action)) {
 			// cancel the next scheduled collection
 			mServiceHandler.removeMessages(MSG_WHAT_COLLECT_STATS);
-			
+
 			Calendar now = Calendar.getInstance();
 			now.roll(Calendar.MINUTE, -1);
 
@@ -546,7 +554,7 @@ public class DaemonService extends Service {
 				// store new stats in database
 				Bundle stats = getStats();
 				StatsContentProvider.store(DaemonService.this, stats);
-				
+
 				// store last stats action
 				mStatsLastAction = new Date();
 			}
@@ -568,14 +576,14 @@ public class DaemonService extends Service {
 			SharedPreferences prefs = getSharedPreferences("dtnd", Context.MODE_PRIVATE);
 			String discoMode = prefs.getString(Preferences.KEY_DISCOVERY_MODE, "smart");
 			boolean stayOn = "on".equals(discoMode) && mDiscoveryState;
-			
+
 			// create stop discovery intent
 			Intent stopIntent = new Intent(this, DaemonService.class);
 			stopIntent.setAction(DaemonService.ACTION_STOP_DISCOVERY);
-			
+
 			if (intent.hasExtra(EXTRA_DISCOVERY_DURATION) && !stayOn) {
 				Long duration = intent.getLongExtra(EXTRA_DISCOVERY_DURATION, 120);
-				
+
 				Message msg = mServiceHandler.obtainMessage();
 				msg.what = MSG_WHAT_STOP_DISCOVERY;
 				msg.arg1 = startId;
@@ -593,11 +601,11 @@ public class DaemonService extends Service {
 			if (!mDiscoveryState) {
 				// start P2P discovery and enable IPND
 				mDaemonProcess.startDiscovery();
-	
+
 				// start Wi-Fi P2P discovery
 				if (mP2pManager != null)
 					mP2pManager.startDiscovery();
-				
+
 				// set global discovery state
 				mDiscoveryState = true;
 			}
@@ -606,15 +614,15 @@ public class DaemonService extends Service {
 			if (mDiscoveryState) {
 				// stop P2P discovery and disable IPND
 				mDaemonProcess.stopDiscovery();
-	
+
 				// stop Wi-Fi P2P discovery
 				if (mP2pManager != null)
 					mP2pManager.stopDiscovery();
-				
+
 				// set global discovery state
 				mDiscoveryState = false;
 			}
-			
+
 			// remove all stop discovery messages
 			mServiceHandler.removeMessages(MSG_WHAT_STOP_DISCOVERY);
 			Log.i(TAG, "Scheduled discovery stop removed.");
@@ -622,48 +630,48 @@ public class DaemonService extends Service {
 			int protocol = intent.getIntExtra("protocol", -1);
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			String password = intent.getStringExtra("password");
-			
+
 			if (password == null) {
 				password = "";
 			}
-			
+
 			mDaemonProcess.startKeyExchange(endpoint.toString(), protocol, password);
 		} else if (ACTION_GIVE_PASSWORD_RESPONSE.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			int session = intent.getIntExtra("session", -1);
 			String password = intent.getStringExtra("password");
-			
+
 			if (password == null) {
 				password = "";
 			}
-			
+
 			mDaemonProcess.givePasswordResponse(endpoint.toString(), session, password);
 		} else if (ACTION_GIVE_HASH_RESPONSE.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			int session = intent.getIntExtra("session", -1);
 			int equals = intent.getIntExtra("equals", -1);
-			
+
 			mDaemonProcess.giveHashResponse(endpoint.toString(), session, equals);
 		} else if (ACTION_GIVE_NEW_KEY_RESPONSE.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			int session = intent.getIntExtra("session", -1);
 			int newKey = intent.getIntExtra("newKey", -1);
-			
+
 			mDaemonProcess.giveNewKeyResponse(endpoint.toString(), session, newKey);
 		} else if (ACTION_GIVE_QR_RESPONSE.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			String data = intent.getStringExtra(KeyExchangeService.EXTRA_DATA);
-			
+
 			mDaemonProcess.giveQRResponse(endpoint.toString(), data);
 		} else if (ACTION_GIVE_NFC_RESPONSE.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			String data = intent.getStringExtra(KeyExchangeService.EXTRA_DATA);
-			
+
 			mDaemonProcess.giveNFCResponse(endpoint.toString(), data);
 		} else if (ACTION_REMOVE_KEY.equals(action)) {
 			SingletonEndpoint endpoint = intent.getParcelableExtra(de.tubs.ibr.dtn.Intent.EXTRA_ENDPOINT);
 			mDaemonProcess.removeKey(endpoint);
-			
+
 			// send intent to refresh views
 			Intent broadcastIntent = new Intent(KeyExchangeService.INTENT_KEY_EXCHANGE);
 			broadcastIntent.putExtra(KeyExchangeService.EXTRA_ACTION, KeyExchangeService.ACTION_KEY_UPDATED);
@@ -676,7 +684,7 @@ public class DaemonService extends Service {
 			if (intent.hasExtra("filelogging")) {
 				String logFilePath = intent.getStringExtra("logfile");
 				int logLevel = intent.getIntExtra("loglevel", 0);
-				
+
 				// alter file logging
 				mDaemonProcess.setLogFile(logFilePath == null ? "" : logFilePath, logLevel);
 			} else {
@@ -684,7 +692,7 @@ public class DaemonService extends Service {
 					int logLevel = intent.getIntExtra("loglevel", 0);
 					mDaemonProcess.setLogging("Core", logLevel);
 				}
-				
+
 				if (intent.hasExtra("debug")) {
 					int debugVerbosity = intent.getIntExtra("debug", 0);
 					mDaemonProcess.setDebug(debugVerbosity);
@@ -696,17 +704,17 @@ public class DaemonService extends Service {
 		if (mDaemonProcess.getState().equals(DaemonState.OFFLINE) && (startId != -1))
 			stopSelf(startId);
 	}
-	
+
 	public Bundle getStats() {
 		// retrieve stats of the native daemon
 		NativeStats nstats = mDaemonProcess.getStats();
-		
+
 		// create a new bundle for statistics
 		Bundle stats_bundle = new Bundle();
-		
+
 		// create parcable stats object
 		stats_bundle.putParcelable("stats", new StatsEntry(nstats));
-		
+
 		// create an array for CL stats
 		ArrayList<ConvergenceLayerStatsEntry> cl_stats = new ArrayList<ConvergenceLayerStatsEntry>();
 
@@ -715,52 +723,52 @@ public class DaemonService extends Service {
 			ConvergenceLayerStatsEntry e = new ConvergenceLayerStatsEntry(nstats, tags.get(i), i);
 			cl_stats.add(e);
 		}
-		
+
 		// add CL stats to bundle
 		stats_bundle.putParcelableArrayList("clstats", cl_stats);
-		
+
 		return stats_bundle;
 	}
 
 	public DaemonService() {
 		super();
 	}
-	
+
 	private static void initializeDtndPreferences(Context context) {
 		SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-		
+
 		// initialize private preferences for dtnd
 		SharedPreferences dtnd_prefs = context.getSharedPreferences("dtnd", Context.MODE_PRIVATE);
-		
+
 		// stop here, if these settings are already initialized
 		if (dtnd_prefs.getBoolean("initialized", false)) return;
-		
+
 		Editor e = dtnd_prefs.edit();
-		
+
 		e.putBoolean(Preferences.KEY_ENABLED, prefs.getBoolean(Preferences.KEY_ENABLED, true));
 		e.putBoolean(Preferences.KEY_P2P_ENABLED, prefs.getBoolean(Preferences.KEY_P2P_ENABLED, false));
 		e.putString(Preferences.KEY_DISCOVERY_MODE, prefs.getString(Preferences.KEY_DISCOVERY_MODE, "smart"));
-		
+
 		int log_options = Integer.valueOf(prefs.getString(Preferences.KEY_LOG_OPTIONS, "0"));
 		e.putInt(Preferences.KEY_LOG_OPTIONS, log_options);
-		
+
 		int debug_verbosity = Integer.valueOf(prefs.getString(Preferences.KEY_LOG_DEBUG_VERBOSITY, "0"));
 		e.putInt(Preferences.KEY_LOG_DEBUG_VERBOSITY, debug_verbosity);
 
 		e.putBoolean(Preferences.KEY_LOG_ENABLE_FILE, prefs.getBoolean(Preferences.KEY_LOG_ENABLE_FILE, false));
-		
+
 		e.putString(Preferences.KEY_UPLINK_MODE, prefs.getString(Preferences.KEY_UPLINK_MODE, "wifi"));
-		
+
 		// set preferences to initialized
 		e.putBoolean("initialized", true);
-		
+
 		e.commit();
 	}
 
 	@Override
 	public void onCreate() {
 		super.onCreate();
-		
+
 		// reset last SSID inspected for discovery
 		mDiscoverySsid = null;
 
@@ -904,18 +912,17 @@ public class DaemonService extends Service {
 			SharedPreferences prefs = getSharedPreferences("dtnd", Context.MODE_PRIVATE);
 
 			switch (state) {
-				case ERROR:
-					break;
-
 				case OFFLINE:
 					// pause p2p manager
 					if (mP2pManager != null) mP2pManager.onPause();
-					
+
 					// unlisten to device state events
 					unregisterReceiver(mScreenStateReceiver);
-					
+
 					// unlisten to Wi-Fi events
 					unregisterReceiver(mNetworkStateReceiver);
+
+					stopForeground(true);
 
 					// disable foreground service only if the daemon has been
 					// switched off
@@ -940,7 +947,7 @@ public class DaemonService extends Service {
 					netstatefilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
 					netstatefilter.addAction(WifiManager.WIFI_STATE_CHANGED_ACTION);
 					registerReceiver(mNetworkStateReceiver, netstatefilter);
-					
+
 					// react to screen on/off events
 					IntentFilter dsfilter = new IntentFilter();
 					dsfilter.addAction(Intent.ACTION_SCREEN_ON);
@@ -951,7 +958,9 @@ public class DaemonService extends Service {
 						// wake-up all apps in stopped-state when going online
 						broadcastIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 					}
-					
+
+					ensureForegroundService();
+
 					// resume p2p manager
 					if (mP2pManager != null) mP2pManager.onResume();
 
@@ -974,17 +983,13 @@ public class DaemonService extends Service {
 								.setAction(de.tubs.ibr.dtn.service.DaemonService.ACTION_START_DISCOVERY);
 						startService(discoIntent);
 					}
-					
+
 					// set initial state
 					PowerManager pm = (PowerManager)getSystemService(Context.POWER_SERVICE);
 					mDaemonProcess.setLeMode(!pm.isScreenOn());
-							
+
 					break;
 
-				case SUSPENDED:
-					break;
-				case UNKOWN:
-					break;
 				default:
 					break;
 
@@ -992,6 +997,32 @@ public class DaemonService extends Service {
 
 			// broadcast state change
 			sendBroadcast(broadcastIntent, de.tubs.ibr.dtn.Intent.PERMISSION_COMMUNICATION);
+		}
+
+		private void ensureForegroundService() {
+			PendingIntent pendingIntent = PendingIntent.getActivity(
+					DaemonService.this, 0,
+					new Intent(DaemonService.this, Preferences.class), 0);
+
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+				NotificationChannel channel = new NotificationChannel(
+						NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID, "DTN Service", NotificationManager.IMPORTANCE_LOW
+				);
+				channel.setDescription("IBR-DTN Daemon Service Status");
+				((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
+			}
+
+			Notification notification =
+					new NotificationCompat.Builder(DaemonService.this, NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID)
+							.setCategory(NotificationCompat.CATEGORY_SERVICE)
+							.setPriority(NotificationCompat.PRIORITY_LOW)
+							.setContentTitle("DTN Service")
+							.setContentText("IBR-DTN Daemon Service running in the Background")
+							.setSmallIcon(R.drawable.ic_notification)
+							.setContentIntent(pendingIntent)
+							.build();
+
+			startForeground(NOTIFICATION_ONGOING_FOREGROUND_ID, notification);
 		}
 
 		@Override
@@ -1013,21 +1044,21 @@ public class DaemonService extends Service {
 			@TargetApi(Build.VERSION_CODES.JELLY_BEAN)
 			@Override
 			public void onReceive(final Context context, final Intent intent) {
-				final ConnectivityManager connMgr = (ConnectivityManager) 
+				final ConnectivityManager connMgr = (ConnectivityManager)
 						context.getSystemService(Context.CONNECTIVITY_SERVICE);
 
-				final android.net.NetworkInfo wifi = 
+				final android.net.NetworkInfo wifi =
 						connMgr.getNetworkInfo(ConnectivityManager.TYPE_WIFI);
 
 				// extract SSID
 				String ssid = wifi.getExtraInfo();
-				
+
 				// forward to the daemon if it is enabled
 				if (wifi.isConnected() && ssid != null) {
 					if (!ssid.equals(mDiscoverySsid)) {
 						// store SSID of last discovery
 						mDiscoverySsid = ssid;
-	
+
 						// tickle the daemon service
 						final Intent wakeUpIntent = new Intent(context, DaemonService.class);
 						wakeUpIntent.setAction(de.tubs.ibr.dtn.service.DaemonService.ACTION_NETWORK_CHANGED);
@@ -1036,14 +1067,14 @@ public class DaemonService extends Service {
 				} else {
 					mDiscoverySsid = null;
 				}
-				
+
 				// get current network info
 				final NetworkInfo info = connMgr.getActiveNetworkInfo();
-				
+
 				// prepare intent to inform the service about the change
 				final Intent connIntent = new Intent(context, DaemonService.class);
 				connIntent.setAction(de.tubs.ibr.dtn.service.DaemonService.ACTION_CONNECTIVITY_CHANGED);
-				
+
 				if (info != null && info.isConnected()) {
 					if (info.getType() == ConnectivityManager.TYPE_WIFI) {
 						if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -1058,12 +1089,12 @@ public class DaemonService extends Service {
 				} else {
 					connIntent.putExtra(EXTRA_CONNECTIVITY_STATE, "offline");
 				}
-				
+
 				// forward connection state to the service
 				context.startService(connIntent);
 			}
 		};
-		
+
 		private BroadcastReceiver mScreenStateReceiver = new BroadcastReceiver() {
 			@Override
 			public void onReceive(Context context, Intent intent) {

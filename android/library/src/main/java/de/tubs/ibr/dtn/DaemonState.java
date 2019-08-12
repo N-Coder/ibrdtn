@@ -25,12 +25,8 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 public enum DaemonState implements Parcelable {
-	UNKOWN,
-	PENDING,
 	ONLINE,
-	OFFLINE,
-	SUSPENDED,
-	ERROR;
+	OFFLINE;
 
     public int describeContents() {
         return 0;
