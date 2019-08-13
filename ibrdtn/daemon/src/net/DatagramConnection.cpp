@@ -80,7 +80,7 @@ namespace dtn {
         void DatagramConnection::setup() throw() {
             _send_next_used_seqno = MAKE_SEQNO(dtn::utils::Random::gen_number());
 
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
                 << "setup(" << getIdentifier() << "), randomized first sender seqno is " << _send_next_used_seqno
                 << IBRCOMMON_LOGGER_ENDL;
 
@@ -127,7 +127,7 @@ namespace dtn {
 
         void DatagramConnection::adjust_rtt(double value) {
             _avg_rtt = (_avg_rtt * AVG_RTT_WEIGHT) + ((1 - AVG_RTT_WEIGHT) * value);
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 45)
                 << "RTT adjusted, measured value: " << std::setprecision(4) << value << ", new avg. RTT: "
                 << _avg_rtt << IBRCOMMON_LOGGER_ENDL;
         }
@@ -151,7 +151,7 @@ namespace dtn {
             ss << "}(" << frames.size() << "/" << width << "/" << max_width << "/" << _params.max_seq_numbers << ")";
             //assert(frames.size() <= width && width <= max_width && max_width <= _params.max_seq_numbers);
             if (frames.size() > width || width > max_width || max_width > _params.max_seq_numbers) {
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 5)
                     << "window width violation: " << ss.str() << IBRCOMMON_LOGGER_ENDL;
             }
             return ss.str();
@@ -243,7 +243,7 @@ namespace dtn {
                     _callback.reportSuccess(f.retry, f.tm.getMilliseconds());
 
                     _send_window_frames.erase(itr);
-                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
                         << "received ACK " << received_seqno << ", new " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
 
                     _send_ack_cond.signal(true);
@@ -273,7 +273,7 @@ namespace dtn {
             bool first = flags.getBit(DatagramService::SEGMENT_FIRST);
             bool last = flags.getBit(DatagramService::SEGMENT_LAST);
 
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                 << "frame received, flags: " << SS_HEX(flags) << " ("
                 << (first ? (last ? "full" : "first") : (last ? "last" : "middle"))
                 << (_recv_is_after_last ? ", after last" : "")
@@ -321,14 +321,14 @@ namespace dtn {
                 }
                 unsigned int sender_width = SEQNO_RANGE_WIDTH(received_seqno, max_seqno);
                 if (sender_width <= _params.max_seq_numbers / 2) {
-                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                         << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
                         << ", width between received and biggest seqno is " << sender_width
                         << " <= max_seq_numbers / 2 -> resending lost selective ACK"
                         << IBRCOMMON_LOGGER_ENDL;
                     _callback.callback_ack(*this, NEXT_SEQNO(received_seqno), getIdentifier());
                 } else {
-                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
                         << "frame " << received_seqno << " is out of the currently possible " << RECV_WINDOW_STRING
                         << ", width between received and biggest seqno is " << sender_width
                         << " > max_seq_numbers / 2 -> ignore frame"
@@ -375,7 +375,7 @@ namespace dtn {
                 << IBRCOMMON_LOGGER_ENDL;
 
             unsigned int flushed = flush_recv_window();
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 31)
                 << "flushed " << flushed << " frames of received data, new " << RECV_WINDOW_STRING
                 << ", sending selective ACK" << IBRCOMMON_LOGGER_ENDL;
             IF_A_ASSERT_B(last, _recv_window_frames.empty() && _recv_is_after_last);
@@ -471,8 +471,6 @@ namespace dtn {
         }
 
         std::char_traits<char>::int_type DatagramConnection::Stream::underflow() {
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
-                << "Stream::underflow()" << IBRCOMMON_LOGGER_ENDL;
 
             try {
                 ibrcommon::MutexLock l(_recv_queue_buf_cond);
@@ -481,6 +479,10 @@ namespace dtn {
                     _recv_queue_buf_cond.wait();
                     check_abort(true);
                 }
+
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 55)
+                    << "Stream::underflow() unlocked with " << _recv_queue_buf_len << " bytes to flush"
+                    << IBRCOMMON_LOGGER_ENDL;
 
                 // copy the queue buffer to an internal buffer
                 ::memcpy(&_in_buf[0], &_recv_queue_buf[0], _recv_queue_buf_len);
@@ -631,17 +633,10 @@ namespace dtn {
         }
 
         std::char_traits<char>::int_type DatagramConnection::Stream::overflow(std::char_traits<char>::int_type c) {
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 40)
-                << "Stream::overflow()" << IBRCOMMON_LOGGER_ENDL;
-
             check_abort(false);
 
             char *ibegin = &_out_buf[0];
             char *iend = pptr();
-
-            // mark the buffer for outgoing data as free
-            // leave 1 byte space for the byte c causing the overflow
-            setp(&_out_buf[0], &_out_buf[0] + _buf_size - 1);
 
             // copy the overflowing byte
             bool is_eof = std::char_traits<char>::eq_int_type(c, std::char_traits<char>::eof());
@@ -649,24 +644,26 @@ namespace dtn {
                 *iend++ = std::char_traits<char>::to_char_type(c);
             }
 
-            // bytes to send
             const dtn::data::Length bytes = (iend - ibegin);
 
-            // if there is nothing to send, just return
-            if (bytes != 0) {
-                try {
-                    _callback.send_serialized_stream_data(&_out_buf[0], bytes, is_eof);
-                } catch (const DatagramException &ex) {
-                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                        << "Stream::overflow() exception: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 55)
+                << "Stream::overflow(char: " << c << (is_eof ? " (EOF)" : "") << ", " << bytes << " bytes to flush)"
+                << IBRCOMMON_LOGGER_ENDL;
 
-                    close(); // close this stream
-                    throw; // re-throw the DatagramException
-                }
-            } else {
+            try {
+                if (bytes != 0)
+                    _callback.send_serialized_stream_data(&_out_buf[0], bytes, is_eof);
+            } catch (const DatagramException &ex) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
-                    << "Stream::overflow() nothing to send" << IBRCOMMON_LOGGER_ENDL;
+                    << "Stream::overflow() exception: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
+
+                close(); // close this stream
+                throw; // re-throw the DatagramException
             }
+
+            // mark the buffer for outgoing data as free
+            // leave 1 byte space for the byte c causing the overflow
+            setp(&_out_buf[0], &_out_buf[0] + _buf_size - 1);
 
             return std::char_traits<char>::not_eof(c);
         }
@@ -682,7 +679,7 @@ namespace dtn {
             if (_send_is_before_first) flags |= DatagramService::SEGMENT_FIRST;
             if (last) flags |= DatagramService::SEGMENT_LAST;
 
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
                 << "frame to send, flags: " << SS_HEX(flags) << " ("
                 << (_send_is_before_first ? (last ? "full" : "first") : (last ? "last" : "middle"))
                 << "), seqno: " << std::dec << seqno << ", len: " << len << " via " << getIdentifier()
@@ -704,7 +701,7 @@ namespace dtn {
             _callback.callback_send(*this, new_frame.flags, seqno, getIdentifier(), &new_frame.buf[0],
                                     new_frame.buf.size());
 
-            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                 << "appended datagram with seqno " << seqno << " to " << SEND_WINDOW_STRING
                 << IBRCOMMON_LOGGER_ENDL;
 
@@ -723,7 +720,7 @@ namespace dtn {
                     // TODO add some minimum delay between sent packets?
                     // FIXME window width violation on appended datagram with seqno 58 to send window {[ #50, len 1278 | retry 0, t 0ms], [ #58, len 1278 | retry 0, t 0ms]}(2/9/8/255)>59
                 }
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 31)
                     << "got ack and send window is no longer full, sender of seqno " << seqno
                     << " can be unblocked, new " << SEND_WINDOW_STRING << IBRCOMMON_LOGGER_ENDL;
             } catch (const ibrcommon::Conditional::ConditionalAbortException &e) {
@@ -737,7 +734,7 @@ namespace dtn {
                     ss << "ConditionalAbortException " << e.reason << ": " << e.what();
                     throw DatagramException(ss.str());
                 }
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 30)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 31)
                     << "done handling timeouts after handling seqno " << seqno << ", new "
                     << SEND_WINDOW_STRING
                     << IBRCOMMON_LOGGER_ENDL;

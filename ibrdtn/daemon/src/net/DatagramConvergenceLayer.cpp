@@ -37,6 +37,8 @@ namespace dtn {
     namespace net {
         static const char *const TAG = "DatagramConvergenceLayer";
 
+        // TODO merge fragmentation support from UDPConvergenceLayer
+
         DatagramConvergenceLayer::DatagramConvergenceLayer(DatagramService *ds)
                 : _service(ds), _receiver(*this), _running(false),
                   _stats_in(0), _stats_out(0), _stats_rtt(0.0), _stats_retries(0), _stats_failure(0) {
@@ -139,7 +141,7 @@ namespace dtn {
 
         void DatagramConvergenceLayer::queue(const dtn::core::Node &node, const dtn::net::BundleTransfer &job) {
             // do not queue any new jobs if the convergence layer goes down
-            if (!_running) { // TODO rework the debugging levels for the whole Datagram space
+            if (!_running) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
                     << "discarding job for " << node.getEID().getString() << ", not running" << IBRCOMMON_LOGGER_ENDL;
                 return;
@@ -301,13 +303,13 @@ namespace dtn {
                     break;
                 }
 
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 70)
                     << "receive() Address: " << address << IBRCOMMON_LOGGER_ENDL;
 
                 // Check for extended header and retrieve if available
                 if (type == DatagramService::FRAME_BROADCAST) {
                     try {
-                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
+                        IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 71)
                             << "receive() Announcement received" << IBRCOMMON_LOGGER_ENDL;
 
                         DiscoveryBeacon beacon = agent.obtainBeacon();

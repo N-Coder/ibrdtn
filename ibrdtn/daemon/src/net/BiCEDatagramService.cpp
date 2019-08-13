@@ -86,7 +86,7 @@ namespace dtn {
                 // copy payload to the new buffer
                 ::memcpy(&tmp[2], buf, length);
 
-                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 60)
                     << "send() "
                     << packet_to_string(type, flags, seqno, buf, length, identifier)
                     << IBRCOMMON_LOGGER_ENDL;
@@ -143,14 +143,13 @@ namespace dtn {
                             ibrcommon::vaddress peeraddr;
                             size_t ret = sock.recvfrom(&tmp[0], length + 2, 0, peeraddr);
                             if (ret == 0) {
-                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 45)
                                     << "recvfrom() got empty datagram from " << peeraddr.toString()
                                     << ", discarding" << IBRCOMMON_LOGGER_ENDL;
                                 continue;
                             } else if (ret == 1) {
-                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
-                                    << "recvfrom() got datagram with only one byte (0x"
-                                    << std::hex << (uint8_t) tmp[0]
+                                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 45)
+                                    << "recvfrom() got datagram with only one byte (0x" << SS_HEX(tmp[0])
                                     << ") from " << peeraddr.toString()
                                     << ", discarding" << IBRCOMMON_LOGGER_ENDL;
                                 continue;
@@ -164,7 +163,7 @@ namespace dtn {
                             // copy payload to the destination buffer
                             ::memcpy(buf, &tmp[2], ret - 2);
 
-                            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                            IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 60)
                                 << "recvfrom() "
                                 << packet_to_string(type, flags, seqno, buf, ret - 2, peeraddr.toString())
                                 << IBRCOMMON_LOGGER_ENDL;
