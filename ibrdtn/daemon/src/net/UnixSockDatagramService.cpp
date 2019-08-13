@@ -1,4 +1,4 @@
-#include "net/BiCEDatagramService.h"
+#include "net/UnixSockDatagramService.h"
 #include <ibrdtn/utils/Utils.h>
 #include <core/NodeEvent.h>
 #include <core/Node.h>
@@ -13,10 +13,10 @@
 
 namespace dtn {
     namespace net {
-        static const char *const TAG = "BiCEDatagramService";
+        static const char *const TAG = "UnixSockDatagramService";
         static const ibrcommon::vinterface vinterface("unix");
 
-        BiCEDatagramService::BiCEDatagramService(const std::string &path, size_t mtu)
+        UnixSockDatagramService::UnixSockDatagramService(const std::string &path, size_t mtu)
                 : _bindpath(path), _remove_on_exit(false) {
             _params.max_msg_length = mtu - FRAME_HEADER_LONG_LENGTH;
             _params.max_seq_numbers = FRAME_SEQNO_LONG_MAX;
@@ -24,7 +24,7 @@ namespace dtn {
             _params.recv_window_size = 8;
         }
 
-        BiCEDatagramService::~BiCEDatagramService() {
+        UnixSockDatagramService::~UnixSockDatagramService() {
             _vsocket.destroy();
         }
 
@@ -32,7 +32,7 @@ namespace dtn {
          * Bind to the local socket.
          * @throw If the bind fails, an DatagramException is thrown.
          */
-        void BiCEDatagramService::bind() throw(DatagramException) {
+        void UnixSockDatagramService::bind() throw(DatagramException) {
             // https://stackoverflow.com/a/10260885/805569
             // need to bind the socket(AF_UNIX, SOCK_DGRAM, 0) to a file here for recvfrom to work
             try {
@@ -60,7 +60,7 @@ namespace dtn {
         /**
          * Shutdown the socket. Unblock all calls on the socket (recv, send, etc.)
          */
-        void BiCEDatagramService::shutdown() {
+        void UnixSockDatagramService::shutdown() {
             if (_remove_on_exit) {
                 remove(_bindpath.c_str());
             }
@@ -73,9 +73,9 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void BiCEDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
-                                       const std::string &identifier, const char *buf,
-                                       size_t length) throw(DatagramException) {
+        void UnixSockDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
+                                           const std::string &identifier, const char *buf,
+                                           size_t length) throw(DatagramException) {
             ibrcommon::vaddress destination(identifier, "", ibrcommon::vaddress::SCOPE_LOCAL, AF_UNIX);
 
             try {
@@ -115,8 +115,8 @@ namespace dtn {
          * @param buf The buffer to send.
          * @param length The number of available bytes in the buffer.
          */
-        void BiCEDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf,
-                                       size_t length) throw(DatagramException) {
+        void UnixSockDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf,
+                                           size_t length) throw(DatagramException) {
             send(type, flags, seqno, _bindpath + ".broadcast", buf, length);
         }
 
@@ -128,8 +128,8 @@ namespace dtn {
          * @throw If the receive call failed for any reason, an DatagramException is thrown.
          * @return The number of received bytes.
          */
-        size_t BiCEDatagramService::recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno,
-                                             std::string &address) throw(DatagramException) {
+        size_t UnixSockDatagramService::recvfrom(char *buf, size_t length, DatagramService::FRAME_TYPE &type, DatagramService::FLAG_BITS &flags, unsigned int &seqno,
+                                                 std::string &address) throw(DatagramException) {
             while (true) {
                 try {
                     ibrcommon::socketset readfds;
@@ -184,7 +184,7 @@ namespace dtn {
          * data is used to contact this node.
          * @return The service description as string.
          */
-        const std::string BiCEDatagramService::getServiceDescription() const {
+        const std::string UnixSockDatagramService::getServiceDescription() const {
             std::stringstream ss;
             ss << getInterface().toString();
             ss << "://";
@@ -196,7 +196,7 @@ namespace dtn {
          * The used interface as vinterface object.
          * @return A vinterface object.
          */
-        const ibrcommon::vinterface &BiCEDatagramService::getInterface() const {
+        const ibrcommon::vinterface &UnixSockDatagramService::getInterface() const {
             return vinterface;
         }
 
@@ -204,11 +204,11 @@ namespace dtn {
          * The protocol identifier for this type of service.
          * @return
          */
-        dtn::core::Node::Protocol BiCEDatagramService::getProtocol() const {
+        dtn::core::Node::Protocol UnixSockDatagramService::getProtocol() const {
             return dtn::core::Node::CONN_DGRAM_UNIX;
         }
 
-        const DatagramService::Parameter &BiCEDatagramService::getParameter() const {
+        const DatagramService::Parameter &UnixSockDatagramService::getParameter() const {
             return _params;
         }
     } /* namespace net */

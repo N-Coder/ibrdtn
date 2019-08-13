@@ -59,7 +59,7 @@
 #include "net/UDPConvergenceLayer.h"
 #include "net/TCPConvergenceLayer.h"
 #include "net/FileConvergenceLayer.h"
-#include "net/BiCEDatagramService.h"
+#include "net/UnixSockDatagramService.h"
 
 #ifdef HAVE_SYS_INOTIFY_H
 #include "net/FileMonitor.h"
@@ -1477,8 +1477,8 @@ namespace dtn
                         case dtn::daemon::Configuration::NetConfig::NETWORK_DGRAM_UNIX:
                         {
                             try {
-                                BiCEDatagramService *dgram_service = new BiCEDatagramService( net.url, net.mtu );
-                                _components[RUNLEVEL_NETWORK].push_back( new DatagramConvergenceLayer(dgram_service) );
+                                UnixSockDatagramService *dgram_service = new UnixSockDatagramService(net.url, net.mtu);
+                                _components[RUNLEVEL_NETWORK].push_back(new DatagramConvergenceLayer(dgram_service));
                                 IBRCOMMON_LOGGER_TAG(NativeDaemon::TAG, info) << "Datagram ConvergenceLayer (UNIX Socket) added on " << net.url << IBRCOMMON_LOGGER_ENDL;
                             } catch (const ibrcommon::Exception &ex) {
                                 IBRCOMMON_LOGGER_TAG(NativeDaemon::TAG, error) << "Failed to add Datagram ConvergenceLayer (UNIX Socket) on " << net.url << ": " << ex.what() << IBRCOMMON_LOGGER_ENDL;

@@ -1,8 +1,6 @@
 ## sub directory
 
 net_SOURCES = BundleReceiver.h \
-	BiCEDatagramService.cpp \
-	BiCEDatagramService.h \
 	BundleTransfer.h \
 	BundleTransfer.cpp \
 	ConnectionEvent.cpp \
@@ -41,6 +39,8 @@ net_SOURCES = BundleReceiver.h \
 	DatagramService.cpp \
 	UDPDatagramService.h \
 	UDPDatagramService.cpp \
+	UnixSockDatagramService.cpp \
+	UnixSockDatagramService.h \
 	FileMonitor.h \
 	FileMonitor.cpp \
 	P2PDialupExtension.h \

@@ -1,5 +1,5 @@
-#ifndef BiCEDatagramService_H_
-#define BiCEDatagramService_H_
+#ifndef UnixSockDatagramService_H_
+#define UnixSockDatagramService_H_
 
 #include "net/DatagramConvergenceLayer.h"
 #include "net/DatagramService.h"
@@ -11,11 +11,11 @@ namespace dtn
 {
 	namespace net
 	{
-		class BiCEDatagramService : public dtn::net::DatagramService
+		class UnixSockDatagramService : public dtn::net::DatagramService
 		{
 		public:
-			BiCEDatagramService(const std::string &path, size_t mtu = 1280);
-			virtual ~BiCEDatagramService();
+			UnixSockDatagramService(const std::string &path, size_t mtu = 1280);
+			virtual ~UnixSockDatagramService();
 
 			/**
 			 * Bind to the local socket.
@@ -86,4 +86,4 @@ namespace dtn
         };
 	} /* namespace net */
 } /* namespace dtn */
-#endif /* BiCEDatagramService_H_ */
+#endif /* UnixSockDatagramService_H_ */
