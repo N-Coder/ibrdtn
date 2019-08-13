@@ -53,6 +53,7 @@ namespace dtn
 			bool operator<(const PrimaryBlock& other) const;
 			bool operator>(const PrimaryBlock& other) const;
 
+            std::string toString() const;
 			int getPriority() const;
 			bool get(dtn::data::PrimaryBlock::FLAGS flag) const;
 

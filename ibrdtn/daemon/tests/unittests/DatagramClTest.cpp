@@ -29,6 +29,30 @@ CPPUNIT_TEST_SUITE_REGISTRATION(DatagramClTest);
 
 dtn::storage::BundleStorage* DatagramClTest::_storage = NULL;
 
+/* DatagramConnection::data_received Test Cases
+ * <if first>
+ * - Sender Aborted, new SeqNo in old Window -> ignore until Sender restarts and chooses new seqno
+ * - Sender Aborted -> 'first' frame with random seqno clears all data
+ * - Sender Clean Restarted ->  _recv_next_expected_seqno will be changed
+ *
+ * <if not in window>
+ * - Duplicate Packet -> overwrite previous if still buffered otherwise ignore data, but resend ACK if close to window
+ * - Lost ACK -> Duplicate Packet
+ * - Lost Last ACK -> Duplicate Packet while after_last
+ * - Lost First ACK, middle ACK delivered -> Duplicate Packet close to window of header/first
+ *
+ * <if not first and after_last>
+ * - Lost First Packet, Second delivered -> ignore second
+ *
+ * <if last>
+ * - Last Frame Received with others pendig -> don't ack last until others received
+ *
+ * flush_recv_window: <if after_last and not first>
+ * - Receiver Aborted -> 'middle' frame while waiting for first
+ *
+ * - First Packet delivered before Last -> preveted by send_serialized_stream_data
+ */
+
 void DatagramClTest::setUp() {
 	// create a new event switch
 	_esl = new ibrtest::EventSwitchLoop();

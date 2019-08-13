@@ -101,6 +101,8 @@ namespace dtn
 			bool operator<(const Bundle& other) const;
 			bool operator>(const Bundle& other) const;
 
+            std::string toString() const;
+
 			template<class T>
 			T& find();
 

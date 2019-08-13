@@ -33,6 +33,7 @@
 #include <ibrcommon/Logger.h>
 #include <list>
 #include <limits>
+#include <iomanip>
 
 #ifdef __DEVELOPMENT_ASSERTIONS__
 #include <cassert>
@@ -554,17 +555,29 @@ namespace dtn
 			// clear all blocks
 			obj.clear();
 
-			// read the primary block
-			(*this) >> (PrimaryBlock&)obj;
-
 			// read until the last block
 			bool lastblock = false;
 
 			block_t block_type;
 			dtn::data::Bitset<Block::ProcFlags> procflags;
 
-			// create a bundle builder
-			dtn::data::BundleBuilder builder(obj);
+            // create a bundle builder
+            dtn::data::BundleBuilder builder(obj);
+
+            Validator::RejectedException reject_reason;
+            try {
+                // read the primary block
+                (*this) >> (PrimaryBlock &) obj;
+            } catch (Validator::RejectedException &e) {
+                // skip all BLOCKs
+                while (!_stream.eof() && !lastblock) {
+                    _stream.get((char &) block_type);
+                    _stream >> procflags;
+                    ignoreBlock(procflags.getBit(Block::BLOCK_CONTAINS_EIDS));
+                    lastblock = procflags.getBit(Block::LAST_BLOCK);
+                }
+                throw;
+            }
 
 			// read all BLOCKs
 			while (!_stream.eof() && !lastblock)
@@ -604,27 +617,8 @@ namespace dtn
 						}
 					}
 				} catch (BundleBuilder::DiscardBlockException &ex) {
-					// skip EIDs
-					if ( procflags.getBit(dtn::data::Block::BLOCK_CONTAINS_EIDS) )
-					{
-						Number eidcount;
-						_stream >> eidcount;
-
-						for (unsigned int i = 0; eidcount > i; ++i)
-						{
-							Number scheme, ssp;
-							_stream >> scheme;
-							_stream >> ssp;
-						}
-					}
-
-					// read the size of the payload in the block
-					Number block_size;
-					_stream >> block_size;
-
-					// skip payload
-					_stream.ignore(block_size.get<std::streamsize>());
-				}
+                    ignoreBlock(procflags.getBit(Block::BLOCK_CONTAINS_EIDS));
+                }
 
 				lastblock = procflags.getBit(Block::LAST_BLOCK);
 			}
@@ -668,7 +662,10 @@ namespace dtn
             } else if (!_stream.good()) {
                 throw dtn::InvalidDataException("Stream went bad before new bundle could be read.");
             } else if (version != dtn::data::BUNDLE_VERSION) {
-                throw dtn::InvalidProtocolException("Bundle version differs from ours.");
+                std::stringstream ss;
+                ss << "Bundle version (" << SS_HEX(version) << ") differs from ours ("
+                   << SS_HEX(dtn::data::BUNDLE_VERSION) << ").";
+                throw dtn::InvalidProtocolException(ss.str());
             }
 
 			// PROCFLAGS
@@ -726,6 +723,31 @@ namespace dtn
 			return (*this);
 		}
 
+		// FIXME in the following we have 3 times nearly the same function
+
+        void DefaultDeserializer::ignoreBlock(bool block_contains_eids) {
+		    // skip EIDs
+            if ( block_contains_eids )
+            {
+                Number eidcount;
+                _stream >> eidcount;
+
+                for (unsigned int i = 0; eidcount > i; ++i)
+                {
+                    Number scheme, ssp;
+                    _stream >> scheme;
+                    _stream >> ssp;
+                }
+            }
+
+            // read the size of the payload in the block
+            Number block_size;
+            _stream >> block_size;
+
+            // skip payload
+            _stream.ignore(block_size.get());
+        }
+
 		Deserializer& DefaultDeserializer::operator >>(dtn::data::Block& obj)
 		{
 			// read EIDs
@@ -755,11 +777,16 @@ namespace dtn
 			Number block_size;
 			_stream >> block_size;
 
-			// validate this block
-			_validator.validate(obj, block_size);
-
-			// read the payload of the block
-			obj.deserialize(_stream, block_size.get<dtn::data::Length>());
+            try {
+                // validate this block
+                _validator.validate( obj, block_size);
+            } catch (Validator::RejectedException &) {
+                // skip the payload of the block
+                _stream.ignore(block_size.get());
+                throw;
+            }
+            // read the payload of the block
+            obj.deserialize(_stream, block_size.get());
 
 			return (*this);
 		}
@@ -793,11 +820,16 @@ namespace dtn
 			Number block_size;
 			_stream >> block_size;
 
-			// validate this block
-			_validator.validate(bundle, obj, block_size);
-
-			// read the payload of the block
-			obj.deserialize(_stream, block_size.get<Length>());
+            try {
+                // validate this block
+                _validator.validate(bundle, obj, block_size);
+            } catch (Validator::RejectedException &) {
+                // skip the payload of the block
+                _stream.ignore(block_size.get());
+                throw;
+            }
+            // read the payload of the block
+            obj.deserialize(_stream, block_size.get());
 
 			return (*this);
 		}

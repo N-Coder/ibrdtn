@@ -42,8 +42,8 @@ namespace dtn
 		class DatagramConnectionCallback
 		{
 		public:
-			virtual ~DatagramConnectionCallback() {};
-			virtual void callback_send(DatagramConnection &connection, const char &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException) = 0;
+			virtual ~DatagramConnectionCallback() = default;;
+			virtual void callback_send(DatagramConnection &connection, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const std::string &destination, const char *buf, const dtn::data::Length &len) throw (DatagramException) = 0;
 			virtual void callback_ack(DatagramConnection &connection, const unsigned int &seqno, const std::string &destination) throw (DatagramException) = 0;
 			virtual void callback_nack(DatagramConnection &connection, const unsigned int &seqno, const std::string &destination) throw (DatagramException) = 0;
 
@@ -58,84 +58,59 @@ namespace dtn
 
 		class DatagramConnection : public ibrcommon::JoinableThread
 		{
-			static const std::string TAG;
-
 		public:
 			DatagramConnection(const std::string &identifier, const DatagramService::Parameter &params, DatagramConnectionCallback &callback);
-			virtual ~DatagramConnection();
+			~DatagramConnection() override;
 
-			void run() throw ();
-			void setup() throw ();
-			void finally() throw ();
-
-			virtual void __cancellation() throw ();
-
+			void run() throw () override;
+			void setup() throw () override;
+			void finally() throw () override;
+			void __cancellation() throw () override;
 			void shutdown();
 
 			const std::string& getIdentifier() const;
+            void setPeerEID(const dtn::data::EID &peer);
+            const dtn::data::EID& getPeerEID();
 
 			/**
 			 * Queue job for delivery to another node
 			 * @param job
 			 */
-			void queue(const dtn::net::BundleTransfer &job);
+			void queue_data_to_send(const dtn::net::BundleTransfer &job);
 
 			/**
 			 * queue data for delivery to the stream
 			 * @param buf
 			 * @param len
 			 */
-			void queue(const char &flags, const unsigned int &seqno, const char *buf, const dtn::data::Length &len);
+			void data_received(const DatagramService::FLAG_BITS &flags, const unsigned int &received_seqno, const char *buf, const dtn::data::Length &len);
 
 			/**
 			 * This method is called by the DatagramCL, if an ACK is received.
 			 * @param seq
 			 */
-			void ack(const unsigned int &seqno);
+			void ack_received(const unsigned int &seqno);
 
 			/**
 			 * This method is called by the DatagramCL, if an permanent NACK is received.
 			 */
-			void nack(const unsigned int &seqno, const bool temporary);
-
-			/**
-			 * Assign a peer EID to this connection
-			 * @param peer The EID of this peer.
-			 */
-			void setPeerEID(const dtn::data::EID &peer);
-
-			/**
-			 * Returns the peer EID of this connection
-			 */
-			const dtn::data::EID& getPeerEID();
+            void nack_received(const unsigned int &seqno);
 
 		private:
-			enum SEND_FLOW {
-				SEND_IDLE,
-				SEND_WAIT_ACK,
-				SEND_NEXT,
-				SEND_ERROR
-			} _send_state;
-
-			enum RECV_FLOW {
-				RECV_IDLE,
-				RECV_HEAD,
-				RECV_TRANSMISSION,
-				RECV_ERROR
-			} _recv_state;
-
 			class Stream : public std::basic_streambuf<char, std::char_traits<char> >, public std::iostream
 			{
 			public:
 				Stream(DatagramConnection &conn, const dtn::data::Length &maxmsglen);
-				virtual ~Stream();
+				~Stream() override;
 
 				/**
 				 * Queueing data received from the CL worker thread for the LOWPANConnection
 				 * @param buf Buffer with received data
 				 * @param len Length of the buffer
 				 */
-				void queue(const char *buf, const dtn::data::Length &len, bool isFirst) throw (DatagramException);
+				void queue_received_data(const char *buf, const dtn::data::Length &len) throw (DatagramException);
+
+				void discard_received_data();
 
 				/**
 				 * Close the stream to terminate all blocking
@@ -143,46 +118,26 @@ namespace dtn
 				 */
 				void close();
 
-				/**
-				 * Skip the outgoing frame set
-				 */
-				void skip();
-
-				/**
-				 * Reject the current incoming frame set
-				 */
-				void reject();
-
 			protected:
-				virtual int sync();
-				virtual std::char_traits<char>::int_type overflow(std::char_traits<char>::int_type = std::char_traits<char>::eof());
-				virtual std::char_traits<char>::int_type underflow();
+				int sync() override;
+				std::char_traits<char>::int_type overflow(std::char_traits<char>::int_type) override;
+				std::char_traits<char>::int_type underflow() override;
 
 			private:
 				// buffer size and maximum message size
 				const dtn::data::Length _buf_size;
 
-				// true, if the next segment if the first of the bundle
-				bool _first_segment;
-
-				// will be set to true if the next segment is the last
-				// of the bundle
-				bool _last_segment;
-
 				// buffer for incoming data to queue
 				// the underflow method will block until
 				// this buffer contains any data
-				std::vector<char> _queue_buf;
+				std::vector<char> _recv_queue_buf;
 
 				// the number of bytes available in the queue buffer
-				dtn::data::Length _queue_buf_len;
-
-				// true if the frame in the queue is the head of the frame-set
-				bool _queue_buf_head;
+				dtn::data::Length _recv_queue_buf_len;
 
 				// conditional to lock the queue buffer and the
 				// corresponding length variable
-				ibrcommon::Conditional _queue_buf_cond;
+				ibrcommon::Conditional _recv_queue_buf_cond;
 
 				// outgoing data from the upper layer is stored
 				// here first and processed by the overflow() method
@@ -196,13 +151,9 @@ namespace dtn
 				// this stream
 				bool _abort;
 
-				// this variable is set to true if the outgoing
-				// frame set should be skipped
-				bool _skip;
+				bool _discard;
 
-				// this variable is set to true if the incoming
-				// frame set should skipped
-				bool _reject;
+				void check_abort(bool check_discard) throw(DatagramException, InvalidDataException);
 
 				// callback to the corresponding connection object
 				DatagramConnection &_callback;
@@ -212,68 +163,48 @@ namespace dtn
 			{
 			public:
 				Sender(DatagramConnection &conn, Stream &stream);
-				~Sender();
+				~Sender() override;
 
-				/**
-				 * skip the current bundle
-				 */
-				void skip() throw ();
-
-				void run() throw ();
-				void finally() throw ();
-				void __cancellation() throw ();
+				void run() throw () override;
+				void finally() throw () override;
+				void __cancellation() throw () override;
 
 				ibrcommon::Queue<dtn::net::BundleTransfer> queue;
-
 			private:
 				DatagramConnection::Stream &_stream;
-
-				// callback to the corresponding connection object
 				DatagramConnection &_connection;
-
-				bool _skip;
 			};
 
 			/**
 			 * Send a new frame
 			 */
-			void stream_send(const char *buf, const dtn::data::Length &len, bool last) throw (DatagramException);
+			void send_serialized_stream_data(const char *buf, const dtn::data::Length &len, bool last) throw (DatagramException);
 
 			/**
 			 * Adjust the average RTT by the new measured value
 			 */
 			void adjust_rtt(double value);
 
-			/**
-			 * True, if the sliding window buffer is exhausted
-			 */
-			bool sw_frames_full();
-
-			/**
-			 * Retransmit the whole sliding window buffer on a timeout
-			 */
-			void sw_timeout(bool last);
+            /**
+             * Retransmit the whole sliding window buffer on a timeout
+             */
+			void handle_ack_timeout(bool last);
 
 			DatagramConnectionCallback &_callback;
-			const std::string _identifier;
 			DatagramConnection::Stream _stream;
 			DatagramConnection::Sender _sender;
 
-			ibrcommon::Conditional _ack_cond;
-			unsigned int _last_ack;
-			unsigned int _next_seqno;
+            double _avg_rtt;
+			ibrcommon::Conditional _send_ack_cond;
+			unsigned int _send_next_used_seqno;
+			unsigned int _recv_next_expected_seqno;
+			bool _send_is_before_first;
+            unsigned int _recv_header_seqno;
+            bool _recv_is_after_last;
 
-			// stores the head of each connection
-			// the head is hold back until at least a second
-			// or the last segment was received
-			std::vector<char> _head_buf;
-			dtn::data::Length _head_len;
-
-			const DatagramService::Parameter _params;
-
-			double _avg_rtt;
-
+            const DatagramService::Parameter _params;
 			dtn::data::EID _peer_eid;
+            const std::string _identifier;
 
 			// buffer for sliding window approach
 			class window_frame {
@@ -282,17 +213,25 @@ namespace dtn
 				window_frame()
 				: flags(0), seqno(0), retry(0) { }
 
-				// destructor
-				virtual ~window_frame() { }
+				virtual ~window_frame() = default;
 
-				char flags;
+				DatagramService::FLAG_BITS flags;
 				unsigned int seqno;
 				std::vector<char> buf;
 				unsigned int retry;
 				ibrcommon::TimeMeasurement tm;
 			};
-			std::list<window_frame> _sw_frames;
-		};
+			std::list<window_frame> _recv_window_frames;
+			std::list<window_frame> _send_window_frames;
+
+            std::string window_to_string(std::list<window_frame> &frames, size_t max_width);
+
+            size_t window_width(std::list<window_frame> &frames) const;
+
+            std::list<DatagramConnection::window_frame>::iterator get_recv_window_frame(const unsigned int &for_seqno);
+
+            unsigned int flush_recv_window();
+        };
 	} /* namespace data */
 } /* namespace dtn */
 #endif /* DATAGRAMCONNECTION_H_ */

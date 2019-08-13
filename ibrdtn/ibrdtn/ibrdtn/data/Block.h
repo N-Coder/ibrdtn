@@ -66,6 +66,8 @@ namespace dtn
 			 */
 			bool operator==(const block_t &id) const;
 
+            virtual std::string toString() const;
+
 			virtual void addEID(const dtn::data::EID &eid);
 			virtual void clearEIDs();
 			virtual const eid_list& getEIDList() const;

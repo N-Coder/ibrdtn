@@ -115,6 +115,8 @@ namespace dtn
 			bool operator<(const PrimaryBlock& other) const;
 			bool operator>(const PrimaryBlock& other) const;
 
+            std::string toString() const;
+
 			Bitset<FLAGS> procflags;
 			Number lifetime;
 			Number appdatalength;

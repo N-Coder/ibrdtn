@@ -22,6 +22,7 @@
 #include "ibrdtn/data/Block.h"
 #include "ibrdtn/data/Bundle.h"
 #include <iostream>
+#include <ibrcommon/Logger.h>
 
 
 namespace dtn
@@ -51,6 +52,17 @@ namespace dtn
 		{
 			return (id == _blocktype);
 		}
+
+		std::string Block::toString() const
+        {
+            std::stringstream ss;
+            ss << "[Block type " << SS_HEX(getType());
+            ss << ", flags " << SS_HEX(getProcessingFlags());
+            ss << ", length " << std::dec << getLength();
+            ss << ", " << getEIDList().size() << " eids";
+            ss << "]";
+            return ss.str();
+        }
 
 		void Block::addEID(const EID &eid)
 		{

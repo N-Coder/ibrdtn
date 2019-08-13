@@ -239,7 +239,10 @@ namespace ibrcommon
 		::strncpy(devname, s_devname.c_str(), IF_NAMESIZE);
 
 		if (__compat_setsockopt((fd == -1) ? _fd : fd, SOL_SOCKET, SO_BINDTODEVICE, &devname, IF_NAMESIZE) < 0) {
-			check_socket_error(errno);
+            int bind_err = myerrno;
+            std::stringstream ss;
+            ss << "cannot set sockopt / bind to device " << s_devname;
+            throw socket_raw_error(bind_err, ss.str());
 		}
 #endif
 	}
@@ -321,18 +324,25 @@ namespace ibrcommon
 		int ret = ::bind(fd, addr, len);
 
 		if (ret < 0) {
-			// error
 			int bind_err = myerrno;
 
             char addr_str[256];
             char serv_str[256];
-            ::getnameinfo(addr, len, (char *) &addr_str, 256, (char *) &serv_str, 256, NI_NUMERICHOST | NI_NUMERICSERV);
-            std::stringstream ss;
-            vaddress vaddr(addr_str, serv_str, addr->sa_family);
-            ss << "with address " << vaddr.toString();
-            ss << " (code " << bind_err << ")";
+            int name_err = ::getnameinfo(
+                    addr, len, (char *) &addr_str, 256, (char *) &serv_str, 256,
+                    NI_NUMERICHOST | NI_NUMERICSERV);
 
-			check_bind_error(bind_err, ss.str());
+            std::stringstream ss;
+            ss << "cannot bind socket ";
+            if (name_err == 0) {
+                vaddress vaddr(addr_str, serv_str, addr->sa_family);
+                ss << "with address " << vaddr.toString();
+            } else {
+                ss << "with unknown address (due to getnameinfo errno " << name_err << ": " << gai_strerror(name_err)
+                   << ")";
+            }
+
+            throw socket_raw_error(bind_err, ss.str());
 		}
 	}
 
@@ -1058,7 +1068,7 @@ namespace ibrcommon
 			// try to bind on port and/or address
 			this->bind(_address);
 
-			if (!_iface.isAny() && !_iface.isLoopback()) {
+			if (!_iface.isAny() && !_iface.isLoopback() && _family != AF_UNIX) {
 				this->set_interface(_iface);
 			}
 		} catch (const socket_exception&) {
@@ -1377,87 +1387,5 @@ namespace ibrcommon
 
 		// successful!
 		IBRCOMMON_LOGGER_DEBUG_TAG("multicastsocket", 70) << "multicast operation (" << optname << ") successful with " << group.toString() << " on " << iface.toString() << IBRCOMMON_LOGGER_ENDL;
-	}
-
-	void basesocket::check_socket_error(const int err) const throw (socket_exception)
-	{
-		switch (err)
-		{
-		case EACCES:
-			throw socket_exception("Permission to create a socket of the specified type and/or protocol is denied.");
-
-		case EAFNOSUPPORT:
-			throw socket_exception("The implementation does not support the specified address family.");
-
-		case EINVAL:
-			throw socket_exception("Unknown protocol, or protocol family not available.");
-
-		case EMFILE:
-			throw socket_exception("Process file table overflow.");
-
-		case ENFILE:
-			throw socket_exception("The system limit on the total number of open files has been reached.");
-
-		case ENOBUFS:
-		case ENOMEM:
-			throw socket_exception("Insufficient memory is available. The socket cannot be created until sufficient resources are freed.");
-
-		case EPROTONOSUPPORT:
-			throw socket_exception("The protocol type or the specified protocol is not supported within this domain.");
-
-		case EBADF:
-			throw socket_exception("The argument sockfd is not a valid file descriptor.");
-
-		case EFAULT:
-			throw socket_exception("The address pointed to by optval is not in a valid part of the process address space.");
-
-		case ENOPROTOOPT:
-			throw socket_exception("The option is unknown at the level indicated.");
-
-		case ENOTSOCK:
-			throw socket_exception("The file descriptor sockfd does not refer to a socket.");
-
-		default:
-			throw socket_exception("Cannot create a socket.");
-		}
-	}
-
-	void basesocket::check_bind_error(const int err, const std::string &msg) const throw (socket_exception)
-	{
-		switch ( err )
-		{
-		case EBADF:
-			throw socket_exception("sockfd is not a valid descriptor.");
-
-		case EINVAL:
-			throw socket_exception("The socket is already bound to an address.");
-
-		case EROFS:
-			throw socket_exception("The socket inode would reside on a read-only filesystem.");
-
-		case EFAULT:
-			throw socket_exception("Given address points outside the user's accessible address space.");
-
-		case ENAMETOOLONG:
-			throw socket_exception("Given address is too long.");
-
-		case ENOENT:
-			throw socket_exception("The file does not exist.");
-
-		case ENOMEM:
-			throw socket_exception("Insufficient kernel memory was available.");
-
-		case ENOTDIR:
-			throw socket_exception("A component of the path prefix is not a directory.");
-
-		case EACCES:
-			throw socket_exception("Search permission is denied on a component of the path prefix.");
-
-		case ELOOP:
-			throw socket_exception("Too many symbolic links were encountered in resolving the given address.");
-
-		default:
-			throw socket_exception("Cannot bind to socket " + msg);
-		}
 	}
 }

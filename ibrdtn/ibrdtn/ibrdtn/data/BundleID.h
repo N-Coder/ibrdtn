@@ -45,7 +45,7 @@ namespace dtn
 			BundleID(const BundleID &id);
 			BundleID& operator=(const BundleID &id);
 
-			std::string toString() const;
+			virtual std::string toString() const;
 
 			friend std::ostream &operator<<(std::ostream &stream, const BundleID &obj);
 			friend std::istream &operator>>(std::istream &stream, BundleID &obj);

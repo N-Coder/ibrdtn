@@ -19,55 +19,74 @@ namespace dtn
 		class DatagramException : public ibrcommon::Exception
 		{
 		public:
-			DatagramException(const std::string &what) : ibrcommon::Exception(what)
-			{};
+		    DatagramException(const std::string &what) : ibrcommon::Exception(what) {};
 
-			virtual ~DatagramException() throw() {};
-		};
-
-		class WrongSeqNoException : public DatagramException
-		{
-		public:
-			WrongSeqNoException(size_t exp_seqno)
-			: DatagramException("Wrong sequence number received"), expected_seqno(exp_seqno)
-			{};
-
-			virtual ~WrongSeqNoException() throw() {};
-
-			const size_t expected_seqno;
+            ~DatagramException() throw() override = default;
 		};
 
 		class DatagramService
 		{
 		public:
-			enum FLOWCONTROL
-			{
-				FLOW_NONE = 0,
-				FLOW_STOPNWAIT = 1,
-				FLOW_SLIDING_WINDOW = 2
-			};
+		    enum FRAME_TYPE {
+                FRAME_BROADCAST = 0,
+                FRAME_SEGMENT = 1,
+                FRAME_ACK = 2,
+                FRAME_NACK = 3,
 
-			enum HEADER_FLAGS
-			{
-				SEGMENT_FIRST = 0x02,
-				SEGMENT_LAST = 0x01,
-				SEGMENT_MIDDLE = 0x00,
-				NACK_TEMPORARY = 0x04
-			};
+                FRAME_TYPE_MASK = 0b11,
+                FRAME_TYPE_BITS = 2
+            };
+            enum FRAME_FLAGS {
+                SEGMENT_FIRST = 1,
+                SEGMENT_LAST = 2,
+
+                FRAME_FLAGS_MASK = 0b11,
+                FRAME_FLAGS_BITS = 2
+            };
+            typedef dtn::data::Bitset<FRAME_FLAGS> FLAG_BITS;
+
+            static size_t FRAME_SEQNO_SHORT_MASK;
+            static size_t FRAME_SEQNO_SHORT_BITS;
+            static size_t FRAME_SEQNO_SHORT_MAX;
+
+            static size_t FRAME_SEQNO_LONG_MASK;
+            static size_t FRAME_SEQNO_LONG_BITS;
+            static size_t FRAME_SEQNO_LONG_MAX;
+
+            static size_t FRAME_HEADER_SHORT_LENGTH;
+            static size_t FRAME_HEADER_LONG_LENGTH;
+
+            static void read_header_short(const char *buf, DatagramService::FRAME_TYPE &type,
+                                          DatagramService::FLAG_BITS &flags, unsigned int &seqno);
+
+            static void write_header_short(char *buf, const DatagramService::FRAME_TYPE &type,
+                                           const DatagramService::FLAG_BITS &flags, const unsigned int &seqno);
+
+            static void read_header_long(const char *buf, DatagramService::FRAME_TYPE &type,
+                                         DatagramService::FLAG_BITS &flags, unsigned int &seqno);
+
+            static void write_header_long(char *buf, const DatagramService::FRAME_TYPE &type,
+                                          const DatagramService::FLAG_BITS &flags, const unsigned int &seqno);
+
+            static std::string packet_to_string(FRAME_TYPE type, const FLAG_BITS &flags,
+                                                unsigned int seqno, const char *buf, size_t buf_len,
+                                                const std::string &address);
 
 			class Parameter
 			{
 			public:
 				// default constructor
 				Parameter()
-				: flowcontrol(FLOW_NONE), max_seq_numbers(2), max_msg_length(1024),
-				  initial_timeout(50), retry_limit(5) { }
+				: max_seq_numbers(2), max_msg_length(1024),
+                  send_window_size(max_seq_numbers / 2), recv_window_size(1),
+				  initial_timeout(200), retry_limit(5) { }
 
 				// destructor
 				virtual ~Parameter() { }
 
-				FLOWCONTROL flowcontrol;
 				unsigned int max_seq_numbers;
+				unsigned int send_window_size;
+				unsigned int recv_window_size;
 				size_t max_msg_length;
 				size_t initial_timeout;
 				size_t retry_limit;
@@ -93,7 +112,7 @@ namespace dtn
 			 * @param length The number of available bytes in the buffer.
 			 * @throw If the transmission wasn't successful this method will throw an exception.
 			 */
-			virtual void send(const char &type, const char &flags, const unsigned int &seqno, const std::string &address, const char *buf, size_t length) throw (DatagramException) = 0;
+			virtual void send(const FRAME_TYPE &type, const FLAG_BITS &flags, const unsigned int &seqno, const std::string &address, const char *buf, size_t length) throw (DatagramException) = 0;
 
 			/**
 			 * Send the payload as datagram to all neighbors (broadcast)
@@ -101,7 +120,7 @@ namespace dtn
 			 * @param length The number of available bytes in the buffer.
 			 * @throw If the transmission wasn't successful this method will throw an exception.
 			 */
-			virtual void send(const char &type, const char &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException) = 0;
+			virtual void send(const FRAME_TYPE &type, const FLAG_BITS &flags, const unsigned int &seqno, const char *buf, size_t length) throw (DatagramException) = 0;
 
 			/**
 			 * Receive an incoming datagram.
@@ -111,13 +130,13 @@ namespace dtn
 			 * @throw If the receive call failed for any reason, an DatagramException is thrown.
 			 * @return The number of received bytes.
 			 */
-			virtual size_t recvfrom(char *buf, size_t length, char &type, char &flags, unsigned int &seqno, std::string &address) throw (DatagramException) = 0;
+			virtual size_t recvfrom(char *buf, size_t length, FRAME_TYPE &type, FLAG_BITS &flags, unsigned int &seqno, std::string &address) throw (DatagramException) = 0;
 
 			/**
 			 * Get the tag for this service used in discovery messages.
 			 * @return The tag as string.
 			 */
-			virtual const std::string getServiceTag() const;
+			virtual std::string getServiceTag() const;
 
 			/**
 			 * Get the service description for this convergence layer. This

@@ -190,16 +190,12 @@ namespace dtn
 		std::string BundleID::toString() const
 		{
 			std::stringstream ss;
-			ss << "[" << timestamp.toString() << "." << sequencenumber.toString();
-
+			ss << "[" << source.getString() << ": t" << timestamp.toString() << ".s" << sequencenumber.toString();
 			if (isFragment())
 			{
-				ss << "." << fragmentoffset.toString();
-				ss << "." << getPayloadLength();
+				ss << " frag off" << fragmentoffset.toString();
 			}
-
-			ss << "] " << source.getString();
-
+            ss << " len" << getPayloadLength() << "]";
 			return ss.str();
 		}
 

@@ -175,11 +175,13 @@ namespace dtn
 			Validator &_validator;
 			AcceptValidator _default_validator;
 
-		private:
+        private:
 			Dictionary _dictionary;
 			bool _compressed;
 			bool _fragmentation;
-		};
+
+            void ignoreBlock(bool block_contains_eids);
+        };
 
 		class SeparateSerializer : public DefaultSerializer
 		{
