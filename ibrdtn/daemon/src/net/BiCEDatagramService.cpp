@@ -14,6 +14,7 @@
 namespace dtn {
     namespace net {
         static const char *const TAG = "BiCEDatagramService";
+        static const ibrcommon::vinterface vinterface("unix");
 
         BiCEDatagramService::BiCEDatagramService(const std::string &path, size_t mtu)
                 : _bindpath(path), _remove_on_exit(false) {
@@ -39,8 +40,7 @@ namespace dtn {
 
                 // ibrcommon::File file(_bindpath);
                 ibrcommon::vaddress addr(_bindpath, "", ibrcommon::vaddress::SCOPE_LOCAL, AF_UNIX);
-                ibrcommon::vinterface inter(ibrcommon::vinterface::LOOPBACK);
-                ibrcommon::udpsocket *udpsocket = new ibrcommon::udpsocket(inter, addr);
+                ibrcommon::udpsocket *udpsocket = new ibrcommon::udpsocket(vinterface, addr);
                 _vsocket.add(udpsocket);
 
                 _vsocket.up();
@@ -117,8 +117,7 @@ namespace dtn {
          */
         void BiCEDatagramService::send(const DatagramService::FRAME_TYPE &type, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno, const char *buf,
                                        size_t length) throw(DatagramException) {
-            // TODO where to send the "I'm here" broadcasts / discovery announcements / beacons
-            send(type, flags, seqno, "/tmp/broadcast", buf, length);
+            send(type, flags, seqno, _bindpath + ".broadcast", buf, length);
         }
 
         /**
@@ -193,8 +192,6 @@ namespace dtn {
             ss << _bindpath;
             return ss.str();
         }
-
-        static const ibrcommon::vinterface vinterface("bice");
 
         /**
          * The used interface as vinterface object.
