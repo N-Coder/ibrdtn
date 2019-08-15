@@ -132,7 +132,11 @@ public class DaemonProcess {
 	public synchronized void clearStorage() {
 		mDaemon.clearStorage();
 	}
-	
+
+	public DaemonRunLevel getRunLevel() {
+		return mDaemon.getRunLevel();
+	}
+
 	public DaemonState getState() {
 	    return mState;
 	}

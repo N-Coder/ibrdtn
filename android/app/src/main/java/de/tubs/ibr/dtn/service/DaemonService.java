@@ -51,6 +51,7 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.preference.PreferenceManager;
 import android.support.v4.app.NotificationCompat;
+import android.text.format.Formatter;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -58,6 +59,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 import de.tubs.ibr.dtn.DTNService;
 import de.tubs.ibr.dtn.DaemonState;
@@ -210,7 +212,7 @@ public class DaemonService extends Service {
 
 		@Override
 		public Bundle getStats() throws RemoteException {
-			return DaemonService.this.getStats();
+			return DaemonService.this.getStatsBundle(null);
 		}
 	};
 
@@ -555,20 +557,23 @@ public class DaemonService extends Service {
 			now.roll(Calendar.MINUTE, -1);
 
 			if (mStatsLastAction == null || mStatsLastAction.before(now.getTime())) {
+				NativeStats nstats = mDaemonProcess.getStats();
+				((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+						.notify(NOTIFICATION_ONGOING_FOREGROUND_ID, buildNotification(nstats));
+
 				// store new stats in database
-				Bundle stats = getStats();
+				Bundle stats = getStatsBundle(nstats);
 				StatsContentProvider.store(DaemonService.this, stats);
 
 				// store last stats action
 				mStatsLastAction = new Date();
 			}
 
-			// schedule next collection in 15 minutes
 			Message msg = mServiceHandler.obtainMessage();
 			msg.what = MSG_WHAT_COLLECT_STATS;
 			msg.arg1 = startId;
 			msg.obj = new Intent(ACTION_STORE_STATS);
-			mServiceHandler.sendMessageDelayed(msg, 900000);
+			mServiceHandler.sendMessageDelayed(msg, TimeUnit.MINUTES.toMillis(5));
 		} else if (ACTION_INITIALIZE.equals(action)) {
 			// initialize configuration
 			Preferences.initializeDefaultPreferences(DaemonService.this);
@@ -713,9 +718,65 @@ public class DaemonService extends Service {
 			stopSelf(startId);
 	}
 
-	public Bundle getStats() {
+	private Notification buildNotification(NativeStats stats) {
+		PendingIntent pendingIntent = PendingIntent.getActivity(
+				DaemonService.this, 0,
+				new Intent(DaemonService.this, Preferences.class), 0);
+
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+			NotificationChannel channel = new NotificationChannel(
+					NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID, "DTN Service", NotificationManager.IMPORTANCE_LOW
+			);
+			channel.setDescription("IBR-DTN Daemon Service Status");
+			((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
+		}
+
+		if (stats == null) {
+			stats = mDaemonProcess.getStats();
+		}
+		DaemonState state = mDaemonProcess.getState();
+		String line1 = "DTN " +
+				state.toString().toLowerCase() + " - " +
+				stats.getNeighbors() + " connected";
+		String line2 = stats.getBundles_transmitted() + " transm, " +
+				stats.getBundles_queued() + " queue, " +
+				stats.getBundles_stored() + " store, " +
+				stats.getBundles_expired() + " expire";
+		String line2Long = stats.getBundles_transmitted() + " transmitted, " +
+				stats.getBundles_queued() + " queued, " +
+				stats.getBundles_stored() + " stored, " +
+				stats.getBundles_expired() + " expired, " +
+				stats.getBundles_aborted() + " aborted, " +
+				stats.getBundles_requeued() + " requeued";
+		String line3 = mDaemonProcess.getRunLevel().toString()
+				.replace("RUNLEVEL", "")
+				.replace("_", " ")
+				.trim() + ", " +
+				Formatter.formatShortFileSize(this, stats.getStorage_size());
+
+		return new NotificationCompat.Builder(this, NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID)
+				.setCategory(NotificationCompat.CATEGORY_SERVICE)
+				.setPriority(NotificationCompat.PRIORITY_LOW)
+				.setShowWhen(true)
+				.setStyle(new NotificationCompat.BigTextStyle()
+						.bigText(line2Long))
+				.setSmallIcon(R.drawable.ic_notification)
+				.setContentIntent(pendingIntent)
+				.setOnlyAlertOnce(true)
+
+				.setWhen(System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(stats.getUptime()))
+				.setContentTitle(line1)
+				.setContentText(line2)
+				.setSubText(line3)
+				.setOngoing(state == DaemonState.ONLINE)
+				.build();
+	}
+
+	public Bundle getStatsBundle(NativeStats nstats) {
 		// retrieve stats of the native daemon
-		NativeStats nstats = mDaemonProcess.getStats();
+		if (nstats == null) {
+			nstats = mDaemonProcess.getStats();
+		}
 
 		// create a new bundle for statistics
 		Bundle stats_bundle = new Bundle();
@@ -936,7 +997,9 @@ public class DaemonService extends Service {
 					// unlisten to Wi-Fi events
 					unregisterReceiver(mNetworkStateReceiver);
 
-					stopForeground(true);
+					stopForeground(false);
+					((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+							.notify(NOTIFICATION_ONGOING_FOREGROUND_ID, buildNotification(null));
 
 					// disable foreground service only if the daemon has been
 					// switched off
@@ -973,7 +1036,7 @@ public class DaemonService extends Service {
 						broadcastIntent.addFlags(Intent.FLAG_INCLUDE_STOPPED_PACKAGES);
 					}
 
-					ensureForegroundService();
+					startForeground(NOTIFICATION_ONGOING_FOREGROUND_ID, buildNotification(null));
 
 					// resume p2p manager
 					if (mP2pManager != null) mP2pManager.onResume();
@@ -1014,39 +1077,22 @@ public class DaemonService extends Service {
 			sendBroadcast(broadcastIntent, de.tubs.ibr.dtn.Intent.PERMISSION_COMMUNICATION);
 		}
 
-		private void ensureForegroundService() {
-			PendingIntent pendingIntent = PendingIntent.getActivity(
-					DaemonService.this, 0,
-					new Intent(DaemonService.this, Preferences.class), 0);
-
-			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-				NotificationChannel channel = new NotificationChannel(
-						NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID, "DTN Service", NotificationManager.IMPORTANCE_LOW
-				);
-				channel.setDescription("IBR-DTN Daemon Service Status");
-				((NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE)).createNotificationChannel(channel);
-			}
-
-			Notification notification =
-					new NotificationCompat.Builder(DaemonService.this, NOTIFICATION_ONGOING_FOREGROUND_CHANNEL_ID)
-							.setCategory(NotificationCompat.CATEGORY_SERVICE)
-							.setPriority(NotificationCompat.PRIORITY_LOW)
-							.setContentTitle("DTN Service")
-							.setContentText("IBR-DTN Daemon Service running in the Background")
-							.setSmallIcon(R.drawable.ic_notification)
-							.setContentIntent(pendingIntent)
-							.build();
-
-			startForeground(NOTIFICATION_ONGOING_FOREGROUND_ID, notification);
-		}
-
 		@Override
 		public void onNeighborhoodChanged() {
 			// nothing to do.
 		}
 
+		private long lastNotificationUpdate = 0;
+
 		@Override
 		public void onEvent(Intent intent) {
+			Log.w(TAG, "onEvent "+intent+" "+intent.getExtras());
+			long time = System.currentTimeMillis();
+			if(time - lastNotificationUpdate > TimeUnit.SECONDS.toMillis(5)) {
+				((NotificationManager) getSystemService(NOTIFICATION_SERVICE))
+						.notify(NOTIFICATION_ONGOING_FOREGROUND_ID, buildNotification(null));
+				lastNotificationUpdate = time;
+			}
 			if (KeyExchangeService.INTENT_KEY_EXCHANGE.equals(intent.getAction())) {
 				sendOrderedBroadcast(intent, null);
 			}
