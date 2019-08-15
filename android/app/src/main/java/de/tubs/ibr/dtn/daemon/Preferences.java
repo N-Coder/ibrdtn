@@ -101,10 +101,10 @@ public class Preferences extends PreferenceActivity {
 	public static final String KEY_UPLINK_MODE = "uplink_mode";
 	
 	// CloudUplink Parameter
-	private static final SingletonEndpoint __CLOUD_EID__ = new SingletonEndpoint("dtn://cloud.dtnbone.dtn");
-	private static final String __CLOUD_PROTOCOL__ = "tcp";
-	private static final String __CLOUD_ADDRESS__ = "134.169.35.130"; // quorra.ibr.cs.tu-bs.de";
-	private static final String __CLOUD_PORT__ = "4559";
+	private static final SingletonEndpoint __CLOUD_EID__ = new SingletonEndpoint("dtn://cloud.bice.dtn");
+	private static final String __CLOUD_PROTOCOL__ = "dgram:unix";
+	private static final String __CLOUD_ADDRESS__ = "116.203.34.191";
+	private static final String __CLOUD_PORT__ = "4556";
 
 	// These preferences show their value as summary
 	private final static String[] mSummaryPrefs = {
@@ -860,6 +860,12 @@ public class Preferences extends PreferenceActivity {
 						}
 					}
 				}
+			}
+
+			{
+				ifaces = ifaces + " bice";
+				p.println("net_bice_type = dgram:unix");
+				p.println("net_bice_path = " + DaemonStorageUtils.getUnixSocket(context, "handler"));
 			}
 
 			p.println("net_interfaces = " + ifaces);

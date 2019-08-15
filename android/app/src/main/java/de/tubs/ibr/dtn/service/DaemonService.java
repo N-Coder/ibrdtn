@@ -135,6 +135,8 @@ public class DaemonService extends Service {
 	// the P2P manager used for wifi direct control
 	private P2pManager mP2pManager = null;
 
+	private BluetoothManager mBtManager= null;
+
 	// the daemon process
 	private DaemonProcess mDaemonProcess = null;
 
@@ -526,6 +528,7 @@ public class DaemonService extends Service {
 						// shutdown all networking components
 						Log.d(TAG, "connectivity: shutdown all networking components");
 						if (mP2pManager != null) mP2pManager.onDestroy();
+						if (mBtManager != null) mBtManager.onDestroy();
 					}
 				}
 
@@ -535,6 +538,7 @@ public class DaemonService extends Service {
 						// re-initialize all networking components
 						Log.d(TAG, "connectivity: re-initialize all networking components");
 						if (mP2pManager != null) mP2pManager.onCreate();
+						if (mBtManager != null) mBtManager.onCreate();
 					}
 				}
 
@@ -605,6 +609,8 @@ public class DaemonService extends Service {
 				// start Wi-Fi P2P discovery
 				if (mP2pManager != null)
 					mP2pManager.startDiscovery();
+				if (mBtManager != null)
+					mBtManager.startDiscovery();
 
 				// set global discovery state
 				mDiscoveryState = true;
@@ -618,6 +624,8 @@ public class DaemonService extends Service {
 				// stop Wi-Fi P2P discovery
 				if (mP2pManager != null)
 					mP2pManager.stopDiscovery();
+				if (mBtManager != null)
+					mBtManager.stopDiscovery();
 
 				// set global discovery state
 				mDiscoveryState = false;
@@ -795,6 +803,8 @@ public class DaemonService extends Service {
 			mP2pManager = new P2pManager(this);
 			mP2pManager.onCreate();
 		}
+		mBtManager = new BluetoothManager(this);
+		mBtManager.onCreate();
 
 		// start initialization of the daemon process
 		final Intent intent = new Intent(this, DaemonService.class);
@@ -841,6 +851,8 @@ public class DaemonService extends Service {
 		// disable P2P manager
 		if (mP2pManager != null)
 			mP2pManager.onDestroy();
+		if (mBtManager != null)
+			mBtManager.onDestroy();
 
 		try {
 			// stop looper thread that handles incoming intents
@@ -859,6 +871,7 @@ public class DaemonService extends Service {
 
 		// dereference P2P Manager
 		mP2pManager = null;
+		mBtManager = null;
 
 		// call super method
 		super.onDestroy();
@@ -915,6 +928,7 @@ public class DaemonService extends Service {
 				case OFFLINE:
 					// pause p2p manager
 					if (mP2pManager != null) mP2pManager.onPause();
+					if (mBtManager != null) mBtManager.onPause();
 
 					// unlisten to device state events
 					unregisterReceiver(mScreenStateReceiver);
@@ -963,6 +977,7 @@ public class DaemonService extends Service {
 
 					// resume p2p manager
 					if (mP2pManager != null) mP2pManager.onResume();
+					if (mBtManager != null) mBtManager.onResume();
 
 					// if discovery is configured as "smart"
 					if ("smart".equals(prefs.getString(Preferences.KEY_DISCOVERY_MODE, "smart"))) {

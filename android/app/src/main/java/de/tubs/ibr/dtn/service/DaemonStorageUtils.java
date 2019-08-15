@@ -78,6 +78,10 @@ public class DaemonStorageUtils {
 	}
 	
 	public static String getConfigurationFile(Context context) {
-		return context.getFilesDir().getPath() + "/" + "config";
+		return context.getFilesDir().getPath() + "/config";
+	}
+
+	public static String getUnixSocket(Context context, String name) {
+		return context.getFilesDir().getPath() + "/" + name;
 	}
 }
