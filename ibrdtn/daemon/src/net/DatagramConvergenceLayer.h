@@ -230,6 +230,8 @@ namespace dtn
 			// conditional to protect _active_conns
 			ibrcommon::Conditional _cond_connections;
 
+			std::set<std::string> _beacon_sender_cache;
+
 			typedef std::list<DatagramConnection*> connection_list;
 			connection_list _connections;
 

@@ -269,7 +269,13 @@ namespace dtn {
                 ibrcommon::MutexLock l(_send_lock);
 
                 // forward the send request to DatagramService
-                _service->send(DatagramService::FRAME_BROADCAST, 0, 0, ss.str().c_str(), static_cast<dtn::data::Length>(len));
+                _service->send(DatagramService::FRAME_BROADCAST, 0, 0, ss.str().c_str(),
+                               static_cast<dtn::data::Length>(len));
+                for (auto address : _beacon_sender_cache) {
+                    _service->send(DatagramService::FRAME_BROADCAST, 0, 0, address, ss.str().c_str(),
+                                   static_cast<dtn::data::Length>(len));
+                }
+                _beacon_sender_cache.clear();
             } catch (const DatagramException &) {
                 // ignore any send failure
             };
@@ -311,6 +317,7 @@ namespace dtn {
                     try {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 71)
                             << "receive() Announcement received" << IBRCOMMON_LOGGER_ENDL;
+                        _beacon_sender_cache.insert(address);
 
                         DiscoveryBeacon beacon = agent.obtainBeacon();
 
