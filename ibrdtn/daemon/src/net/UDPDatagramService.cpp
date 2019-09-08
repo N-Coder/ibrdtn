@@ -181,7 +181,6 @@ namespace dtn {
             }
             // throw exception if all sends failed
             throw DatagramException("send failed, no usable socket available");
-            }
         }
 
         /**
