@@ -174,11 +174,13 @@ namespace dtn {
                     } catch (const ibrcommon::Exception &) {
                     } catch (const std::bad_cast &) {}
                 }
-
-                // throw exception if all sends failed
-                throw DatagramException("send failed");
-            } catch (const ibrcommon::Exception &) {
-                throw DatagramException("send failed");
+            } catch (const ibrcommon::Exception &e) {
+                std::stringstream ss;
+                ss << "send failed: " << e.what();
+                throw DatagramException(ss.str());
+            }
+            // throw exception if all sends failed
+            throw DatagramException("send failed, no usable socket available");
             }
         }
 
