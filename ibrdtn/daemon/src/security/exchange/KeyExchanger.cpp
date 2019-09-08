@@ -63,7 +63,7 @@ namespace dtn
 		 : _next_expiration(0)
 		{
 			AbstractWorker::initialize("key-exchange");
-
+            // TODO these are never reclaimed -> memory leak
 			// add exchange protocols
 			(new NoneProtocol(*this))->add(_protocols);
 			(new DHProtocol(*this))->add(_protocols);

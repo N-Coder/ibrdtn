@@ -40,12 +40,13 @@ namespace dtn {
 
                 // ibrcommon::File file(_bindpath);
                 ibrcommon::vaddress addr(_bindpath, "", ibrcommon::vaddress::SCOPE_LOCAL, AF_UNIX);
+                // TODO make parent directories, overwrite file itself
                 ibrcommon::udpsocket *udpsocket = new ibrcommon::udpsocket(vinterface, addr);
                 _vsocket.add(udpsocket);
 
                 _vsocket.up();
 
-                if (udpsocket->ready()) {
+                if (udpsocket->ready()) { // TODO exceptions in up will cause socket file to persist => unconditionally delete and log warning?
                     _remove_on_exit = true;
                 } else {
                     throw DatagramException("udpsocket is not ready");

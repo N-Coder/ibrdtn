@@ -90,6 +90,7 @@ namespace dtn
 
 		void CompressedPayloadBlock::compress(dtn::data::Bundle &b, CompressedPayloadBlock::COMPRESS_ALGS alg)
 		{
+		    // TODO log compressing / extracting
 			Bundle::iterator p_it = b.find(dtn::data::PayloadBlock::BLOCK_TYPE);
 			if (p_it == b.end()) throw ibrcommon::Exception("Payload block missing.");
 			dtn::data::PayloadBlock &p = dynamic_cast<dtn::data::PayloadBlock&>(**p_it);
