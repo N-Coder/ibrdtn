@@ -60,7 +60,7 @@ namespace ibrcommon
 	};
 
 	template <class map>
-	class key_iterator {
+class key_iterator : public map::iterator {
 		typename map::const_iterator iter_;
 	public:
 		key_iterator() {}
