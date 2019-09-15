@@ -2,7 +2,7 @@ LOCAL_PATH := $(call my-dir)
 JNI_PATH := $(LOCAL_PATH)
 
 # include openssl
-include $(JNI_PATH)/openssl_Android.mk
+# include $(JNI_PATH)/openssl_Android.mk
 
 # include nl-3
 include $(JNI_PATH)/nl-3/android_toolchain/jni/Android_static.mk

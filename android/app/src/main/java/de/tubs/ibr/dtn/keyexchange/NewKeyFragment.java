@@ -132,7 +132,7 @@ public class NewKeyFragment extends Fragment {
 			trustLevelImageOldKey1.setImageDrawable(d);
 			trustLevelImageOldKey2.setImageDrawable(d);
 			
-			d = getResources().getDrawable(R.drawable.ic_action_security_open);
+			d = getResources().getDrawable(R.drawable.ic_security_open);
 			trustLevelImageOldKey3.setImageDrawable(d);
 		}
 		else if (trustLevel > 0) {
@@ -140,12 +140,12 @@ public class NewKeyFragment extends Fragment {
 			d.setColorFilter(getResources().getColor(R.color.trust_low), Mode.SRC_IN);
 			trustLevelImageOldKey1.setImageDrawable(d);
 			
-			d = getResources().getDrawable(R.drawable.ic_action_security_open);
+			d = getResources().getDrawable(R.drawable.ic_security_open);
 			trustLevelImageOldKey2.setImageDrawable(d);
 			trustLevelImageOldKey3.setImageDrawable(d);
 		}
 		else {
-			Drawable d = getResources().getDrawable(R.drawable.ic_action_security_open).mutate();
+			Drawable d = getResources().getDrawable(R.drawable.ic_security_open).mutate();
 			trustLevelImageOldKey1.setImageDrawable(d);
 			trustLevelImageOldKey2.setImageDrawable(d);
 			trustLevelImageOldKey3.setImageDrawable(d);
@@ -172,7 +172,7 @@ public class NewKeyFragment extends Fragment {
 			trustLevelImageNewKey1.setImageDrawable(d);
 			trustLevelImageNewKey2.setImageDrawable(d);
 			
-			d = getResources().getDrawable(R.drawable.ic_action_security_open);
+			d = getResources().getDrawable(R.drawable.ic_security_open);
 			trustLevelImageNewKey3.setImageDrawable(d);
 		}
 		else if (mProtocol == 1 || mProtocol == 0) {
@@ -180,12 +180,12 @@ public class NewKeyFragment extends Fragment {
 			d.setColorFilter(getResources().getColor(R.color.trust_low), Mode.SRC_IN);
 			trustLevelImageNewKey1.setImageDrawable(d);
 			
-			d = getResources().getDrawable(R.drawable.ic_action_security_open);
+			d = getResources().getDrawable(R.drawable.ic_security_open);
 			trustLevelImageNewKey2.setImageDrawable(d);
 			trustLevelImageNewKey3.setImageDrawable(d);
 		}
 		else {
-			Drawable d = getResources().getDrawable(R.drawable.ic_action_security_open).mutate();
+			Drawable d = getResources().getDrawable(R.drawable.ic_security_open).mutate();
 			trustLevelImageNewKey1.setImageDrawable(d);
 			trustLevelImageNewKey2.setImageDrawable(d);
 			trustLevelImageNewKey3.setImageDrawable(d);

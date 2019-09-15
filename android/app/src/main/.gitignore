@@ -27,6 +27,9 @@ libs
 # JNI
 #
 
+jni/androgenizer
+jni/android-ifaddrs
+
 # ignore symlinked folders
 jni/dtnd
 jni/ibrcommon

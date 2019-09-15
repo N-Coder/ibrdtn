@@ -1,3 +1,9 @@
+ibrdtnd (1.2.0) stable; urgency=medium
+
+  * Version increased for updated build system
+
+ -- Simon Fink <simon.fink@uni-passau.de>  Fri, 09 Aug 2019 09:42:42 +0200
+
 ibrdtnd (1.0.1) stable; urgency=medium
 
   * Fix user and file permissions in logrotate configuration file

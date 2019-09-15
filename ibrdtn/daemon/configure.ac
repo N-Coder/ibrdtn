@@ -77,23 +77,23 @@ ANDROID_AC_BUILD([
 	use_lowpan="no"
 
 	# DTNSec
-	with_dtnsec="yes"
+	with_dtnsec="no"
 	
 	# OPENSSL
-	AC_DEFINE(HAVE_OPENSSL, [1], ["openssl library is available"])
-	OPENSSL_CFLAGS="-DOPENSSL_EXPERIMENTAL_JPAKE"
-	OPENSSL_LIBS="-lssl -lcryptox"
-	AC_SUBST(OPENSSL_CFLAGS)
-	AC_SUBST(OPENSSL_LIBS)
+	#AC_DEFINE(HAVE_OPENSSL, [1], ["openssl library is available"])
+	#OPENSSL_CFLAGS="-DOPENSSL_EXPERIMENTAL_JPAKE"
+	#OPENSSL_LIBS="-lssl -lcryptox"
+	#AC_SUBST(OPENSSL_CFLAGS)
+	#AC_SUBST(OPENSSL_LIBS)
 
 	# TLS
-	AC_DEFINE(WITH_TLS, [1], ["tls support enabled"])
-	CPPFLAGS="$CPPFLAGS -DWITH_TLS"
-	with_tls="yes"
+	#AC_DEFINE(WITH_TLS, [1], ["tls support enabled"])
+	#CPPFLAGS="$CPPFLAGS -DWITH_TLS"
+	with_tls="no"
 	
 	# enable JPAKE for key-exchange
-	AC_DEFINE(HAVE_OPENSSL_JPAKE_H, [1], ["openssl jpake extension available"])
-	with_jpake="yes"
+	#AC_DEFINE(HAVE_OPENSSL_JPAKE_H, [1], ["openssl jpake extension available"])
+	with_jpake="no"
 
 	# REGEX
 	AC_DEFINE(HAVE_REGEX_H, [1] ["Define to 1 if you have the <regex.h> header file."])

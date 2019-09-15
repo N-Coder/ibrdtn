@@ -38,6 +38,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <net/if.h>
+#include <errno.h>
 #endif
 
 #include <string.h>
@@ -82,12 +83,12 @@ namespace ibrcommon
 	}
 
 #define __close closesocket
-#define __errno WSAGetLastError()
+#define myerrno WSAGetLastError()
 #else
 #define __compat_setsockopt ::setsockopt
 #define __init_sockets void
 #define __close ::close
-#define __errno errno
+#define myerrno errno
 #endif
 
 	int basesocket::DEFAULT_SOCKET_FAMILY = AF_INET6;
@@ -238,7 +239,7 @@ namespace ibrcommon
 		::strncpy(devname, s_devname.c_str(), IF_NAMESIZE);
 
 		if (__compat_setsockopt((fd == -1) ? _fd : fd, SOL_SOCKET, SO_BINDTODEVICE, &devname, IF_NAMESIZE) < 0) {
-            int bind_err = __errno;
+            int bind_err = myerrno;
             std::stringstream ss;
             ss << "cannot set sockopt / bind to device " << s_devname;
             throw socket_raw_error(bind_err, ss.str());
@@ -286,7 +287,7 @@ namespace ibrcommon
                 std::stringstream ss;
                 ss << "cannot create socket for addr " << addr.toString() << " with family " << _family
                    << ", type " << type << " and protocol " << protocol;
-                throw socket_raw_error(__errno, ss.str());
+                throw socket_raw_error(myerrno, ss.str());
             }
         } catch (const vaddress::address_exception &) {
             // if no address is set use DEFAULT_SOCKET_FAMILY
@@ -303,7 +304,7 @@ namespace ibrcommon
                 std::stringstream ss;
                 ss << "cannot create socket for addr " << addr.toString() << " with default family, type "
                    << type << " and protocol " << protocol;
-                throw socket_raw_error(__errno, ss.str());
+                throw socket_raw_error(myerrno, ss.str());
             }
         }
     }
@@ -314,7 +315,7 @@ namespace ibrcommon
             std::stringstream ss;
             ss << "cannot create socket with domain/family " << _family
                << ", type " << type << " and protocol " << protocol;
-            throw socket_raw_error(__errno, ss.str());
+            throw socket_raw_error(myerrno, ss.str());
         }
     }
 
@@ -323,7 +324,7 @@ namespace ibrcommon
 		int ret = ::bind(fd, addr, len);
 
 		if (ret < 0) {
-			int bind_err = __errno;
+			int bind_err = myerrno;
 
             char addr_str[256];
             char serv_str[256];
@@ -381,7 +382,7 @@ namespace ibrcommon
 	{
 		ssize_t ret = ::send(this->fd(), data, len, flags);
 		if (ret == -1) {
-			switch (__errno)
+			switch (myerrno)
 			{
 			case EPIPE:
 				// connection has been reset
@@ -406,7 +407,7 @@ namespace ibrcommon
 	{
 		ssize_t ret = ::recv(this->fd(), data, len, flags);
 		if (ret == -1) {
-			switch (__errno)
+			switch (myerrno)
 			{
 			case EPIPE:
 				// connection has been reset
@@ -572,7 +573,7 @@ namespace ibrcommon
             freeaddrinfo(res);
         }
         if (len == -1) {
-            throw socket_raw_error(__errno);
+            throw socket_raw_error(myerrno);
         }
     }
 
@@ -900,14 +901,14 @@ namespace ibrcommon
 
 				// connect to the current address using the created socket
 				if (::connect(fd, walk->ai_addr, walk->ai_addrlen) != 0) {
-					if (__errno != EINPROGRESS) {
+					if (myerrno != EINPROGRESS) {
 						// the connect failed, so we close the socket immediately
 						__close(fd);
 
 						/* Hier kann eine Fehlermeldung hin, z.B. mit warn() */
 						if ((walk->ai_next == NULL) && (probesocket.size() == 0))
 						{
-							throw socket_raw_error(__errno);
+							throw socket_raw_error(myerrno);
 						}
 						continue;
 					}
@@ -1343,7 +1344,7 @@ namespace ibrcommon
 
 			if ( __compat_setsockopt(this->fd(), level, optname, &req, sizeof(req)) == -1 )
 			{
-				throw socket_raw_error(__errno, "setsockopt()");
+				throw socket_raw_error(myerrno, "setsockopt()");
 			}
 		} else {
 			struct ipv6_mreq req;
@@ -1361,7 +1362,7 @@ namespace ibrcommon
 
 			if ( __compat_setsockopt(this->fd(), level, optname, &req, sizeof(req)) == -1 )
 			{
-				throw socket_raw_error(__errno, "setsockopt()");
+				throw socket_raw_error(myerrno, "setsockopt()");
 			}
 		}
 #else
@@ -1380,7 +1381,7 @@ namespace ibrcommon
 
 		if ( __compat_setsockopt(this->fd(), level, optname, &req, sizeof(req)) == -1 )
 		{
-			throw socket_raw_error(__errno, "setsockopt()");
+			throw socket_raw_error(myerrno, "setsockopt()");
 		}
 #endif
 

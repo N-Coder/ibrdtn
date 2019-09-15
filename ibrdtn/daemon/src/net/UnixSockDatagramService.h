@@ -82,7 +82,6 @@ namespace dtn
 			DatagramService::Parameter _params;
             std::string _bindpath;
             ibrcommon::vsocket _vsocket;
-            bool _remove_on_exit;
         };
 	} /* namespace net */
 } /* namespace dtn */

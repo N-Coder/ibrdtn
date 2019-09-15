@@ -17,7 +17,7 @@ namespace dtn {
         static const ibrcommon::vinterface vinterface("unix");
 
         UnixSockDatagramService::UnixSockDatagramService(const std::string &path, size_t mtu)
-                : _bindpath(path), _remove_on_exit(false) {
+                : _bindpath(path) {
             _params.max_msg_length = mtu - FRAME_HEADER_LONG_LENGTH;
             _params.max_seq_numbers = FRAME_SEQNO_LONG_MAX;
             _params.send_window_size = 8;
@@ -38,18 +38,28 @@ namespace dtn {
             try {
                 _vsocket.destroy();
 
-                // ibrcommon::File file(_bindpath);
+                // TODO make parent directories
+                int remove_ret = remove(_bindpath.c_str());
+                int remove_errno = errno;
+                if (remove_ret == 0) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
+                        << "overwriting UNIX socket file "
+                        << _bindpath
+                        << IBRCOMMON_LOGGER_ENDL;
+                } else if (remove_errno != ENOENT) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
+                        << "could not remove UNIX socket file "
+                        << _bindpath << ": " << remove_errno << " " << strerror(remove_errno)
+                        << IBRCOMMON_LOGGER_ENDL;
+                }
                 ibrcommon::vaddress addr(_bindpath, "", ibrcommon::vaddress::SCOPE_LOCAL, AF_UNIX);
-                // TODO make parent directories, overwrite file itself
-                ibrcommon::udpsocket *udpsocket = new ibrcommon::udpsocket(vinterface, addr);
-                _vsocket.add(udpsocket);
+                ibrcommon::udpsocket *socket = new ibrcommon::udpsocket(vinterface, addr);
+                _vsocket.add(socket);
 
                 _vsocket.up();
 
-                if (udpsocket->ready()) { // TODO exceptions in up will cause socket file to persist => unconditionally delete and log warning?
-                    _remove_on_exit = true;
-                } else {
-                    throw DatagramException("udpsocket is not ready");
+                if (!socket->ready()) {
+                    throw DatagramException("socket is not ready");
                 }
             } catch (const ibrcommon::Exception &e) {
                 std::stringstream ss;
@@ -62,10 +72,8 @@ namespace dtn {
          * Shutdown the socket. Unblock all calls on the socket (recv, send, etc.)
          */
         void UnixSockDatagramService::shutdown() {
-            if (_remove_on_exit) {
-                remove(_bindpath.c_str());
-            }
             _vsocket.down();
+            remove(_bindpath.c_str());
         }
 
         /**

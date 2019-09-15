@@ -102,11 +102,11 @@ ANDROID_AC_BUILD([
 	AC_DEFINE(HAVE_ENDIAN_H, [1], [])
 
 	# OpenSSL
-	AC_DEFINE(IBRDTN_SUPPORT_BSP, [1], [bundle security protocol supported])
-	AC_DEFINE(HAVE_OPENSSL, [1], [])
-	OPENSSL_LIBS="-lssl -lcryptox"
-	AC_SUBST(OPENSSL_LIBS)
-	with_dtnsec="yes"
+	#AC_DEFINE(IBRDTN_SUPPORT_BSP, [1], [bundle security protocol supported])
+	#AC_DEFINE(HAVE_OPENSSL, [1], [])
+	#OPENSSL_LIBS="-lssl -lcryptox"
+	#AC_SUBST(OPENSSL_LIBS)
+	with_dtnsec="no"
 
 	# Compression
 	AC_DEFINE(IBRDTN_SUPPORT_COMPRESSION, [1], [bundle compression support])
