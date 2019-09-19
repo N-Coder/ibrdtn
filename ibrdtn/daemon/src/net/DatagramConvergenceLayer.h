@@ -74,7 +74,9 @@ namespace dtn
 
 			void onAdvertiseBeacon(const ibrcommon::vinterface &iface, const DiscoveryBeacon &beacon) throw ();
 
-		protected:
+            void open(const dtn::core::Node &node) override;
+
+        protected:
 			virtual void componentUp() throw ();
 			virtual void componentRun() throw ();
 			virtual void componentDown() throw ();

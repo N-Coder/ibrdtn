@@ -108,7 +108,8 @@ namespace dtn {
             return _service->getProtocol();
         }
 
-        void DatagramConvergenceLayer::callback_send(DatagramConnection &, const DatagramService::FLAG_BITS &flags, const unsigned int &seqno,
+        void DatagramConvergenceLayer::callback_send(DatagramConnection &, const DatagramService::FLAG_BITS &flags,
+                                                     const unsigned int &seqno,
                                                      const std::string &destination, const char *buf,
                                                      const dtn::data::Length &len) throw(DatagramException) {
             // only on sender at once
@@ -199,6 +200,7 @@ namespace dtn {
             IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 10)
                 << "Selected identifier: " << connection->getIdentifier() << IBRCOMMON_LOGGER_ENDL;
             connection->start();
+            _beacon_sender_cache.insert(identifier);
             return *connection;
         }
 
@@ -279,6 +281,19 @@ namespace dtn {
             } catch (const DatagramException &) {
                 // ignore any send failure
             };
+        }
+
+        void DatagramConvergenceLayer::open(const dtn::core::Node &node) {
+            const std::list<Node::URI> urilist = node.getAll();
+            for (const auto &uri : urilist) {
+                if (getDiscoveryProtocol() == uri.protocol) {
+                    IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 20)
+                        << "opening/announcing dgram connection to " << uri.value << IBRCOMMON_LOGGER_ENDL;
+                    _beacon_sender_cache.insert(uri.value);
+                }
+            }
+            throw dtn::net::ConnectionNotAvailableException();
+
         }
 
         void DatagramConvergenceLayer::receive() throw() {

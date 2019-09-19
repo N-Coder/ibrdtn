@@ -38,7 +38,7 @@ namespace dtn {
             try {
                 _vsocket.destroy();
 
-                // TODO make parent directories
+                // TODO make parent directories, also reuse for mkdirs-p/overwrite for API server
                 int remove_ret = remove(_bindpath.c_str());
                 int remove_errno = errno;
                 if (remove_ret == 0) {

@@ -199,6 +199,7 @@ namespace dtn {
         DatagramConnection::Stream::~Stream() = default;
 
         void DatagramConnection::Stream::discard_received_data() {
+            ibrcommon::MutexLock l(_recv_queue_buf_cond);
             _discard = true;
             _recv_queue_buf_cond.signal(true);
         }
@@ -653,6 +654,7 @@ namespace dtn {
             try {
                 if (bytes != 0)
                     _callback.send_serialized_stream_data(&_out_buf[0], bytes, is_eof);
+                    // FIXME this might be bigger than the MTU, or is the _stream buffer always overflowing at max_msg_length?
             } catch (const DatagramException &ex) {
                 IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
                     << "Stream::overflow() exception: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
