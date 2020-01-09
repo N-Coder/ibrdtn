@@ -204,8 +204,8 @@ namespace dtn {
             _recv_queue_buf_cond.signal(true);
         }
 
-        void
-        DatagramConnection::Stream::check_abort(bool check_discard) throw(DatagramException, InvalidDataException) {
+        void DatagramConnection::Stream::check_abort(bool check_discard)
+            throw(DatagramException, InvalidDataException) {
             if (_abort) {
                 throw DatagramException("stream aborted");
             }
@@ -294,9 +294,10 @@ namespace dtn {
                 } else {
                     if (!_recv_window_frames.empty() || !_recv_is_after_last) {
                         IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 25)
-                            << "first frame received while other frames are pending, "
-                               "discarding data and resetting receive seqno from "
-                            << _recv_next_expected_seqno << " to " << received_seqno
+                            << "new first frame " << received_seqno << " received while "
+                               "middle frame " << _recv_next_expected_seqno
+                            << " following previous first frame " << _recv_header_seqno
+                            << " was pending, discarding data and resetting receive seqno."
                             << IBRCOMMON_LOGGER_ENDL;
                         _stream.discard_received_data();
                         _recv_window_frames.clear();
@@ -467,12 +468,11 @@ namespace dtn {
                 // notify waiting threads
                 _recv_queue_buf_cond.signal();
             } catch (ibrcommon::Conditional::ConditionalAbortException &ex) {
-                throw DatagramException("stream aborted");
+                throw DatagramException("stream conditional aborted");
             }
         }
 
         std::char_traits<char>::int_type DatagramConnection::Stream::underflow() {
-
             try {
                 ibrcommon::MutexLock l(_recv_queue_buf_cond);
                 check_abort(true);
@@ -498,7 +498,17 @@ namespace dtn {
 
                 return std::char_traits<char>::not_eof(_in_buf[0]);
             } catch (ibrcommon::Conditional::ConditionalAbortException &ex) {
-                throw DatagramException("stream aborted");
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "Stream::underflow() ConditionalAbortException: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
+                throw DatagramException("stream conditional aborted");
+            } catch (const DatagramException &ex) {
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "Stream::underflow() DatagramException: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
+                throw;
+            } catch (const InvalidDataException &ex) {
+                IBRCOMMON_LOGGER_DEBUG_TAG(TAG, 35)
+                    << "Stream::underflow() InvalidDataException: " << ex.what() << IBRCOMMON_LOGGER_ENDL;
+                throw;
             }
         }
 

@@ -273,7 +273,7 @@ namespace dtn {
                 // forward the send request to DatagramService
                 _service->send(DatagramService::FRAME_BROADCAST, 0, 0, ss.str().c_str(),
                                static_cast<dtn::data::Length>(len));
-                for (auto address : _beacon_sender_cache) {
+                for (auto address : _beacon_sender_cache) { // TODO locking
                     _service->send(DatagramService::FRAME_BROADCAST, 0, 0, address, ss.str().c_str(),
                                    static_cast<dtn::data::Length>(len));
                 }
