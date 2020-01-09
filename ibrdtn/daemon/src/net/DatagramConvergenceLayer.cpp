@@ -37,8 +37,6 @@ namespace dtn {
     namespace net {
         static const char *const TAG = "DatagramConvergenceLayer";
 
-        // TODO merge fragmentation support from UDPConvergenceLayer
-
         DatagramConvergenceLayer::DatagramConvergenceLayer(DatagramService *ds)
                 : _service(ds), _receiver(*this), _running(false),
                   _stats_in(0), _stats_out(0), _stats_rtt(0.0), _stats_retries(0), _stats_failure(0) {

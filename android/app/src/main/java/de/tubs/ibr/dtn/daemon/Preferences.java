@@ -102,7 +102,7 @@ public class Preferences extends PreferenceActivity {
 	
 	// CloudUplink Parameter
 	private static final SingletonEndpoint __CLOUD_EID__ = new SingletonEndpoint("dtn://cloud.bice.dtn");
-	private static final String __CLOUD_PROTOCOL__ = "dgram:unix";
+	private static final String __CLOUD_PROTOCOL__ = "tcp";
 	private static final String __CLOUD_ADDRESS__ = "116.203.34.191";
 	private static final String __CLOUD_PORT__ = "4556";
 
